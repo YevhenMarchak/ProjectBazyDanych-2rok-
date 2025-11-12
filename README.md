@@ -5,8 +5,8 @@ Dzięki zastosowaniu relacyjnego modelu danych system zapewni spójność, integ
 
 2. Etapy realizacji projektu
 2.1. Projekt modelu danych
-Na podstawie wymagań zostanie przygotowany model ERD (Entity-Relationship Diagram).
-Zostaną zidentyfikowane następujące główne encje:
+Został przygotowany model ERD (Entity-Relationship Diagram).
+Zostały zidentyfikowane następujące główne encje:
 •	SUPPLIERS (Dostawcy) – dane o firmach dostarczających towary,
 •	CATEGORIES (Kategorie) – klasyfikacja produktów według rodzaju,
 •	PRODUCTS (Towary) – informacje o produktach magazynowych,
