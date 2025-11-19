@@ -1,0 +1,62 @@
+Ile produktów mamy w każdej kategorii i kto jest ich dostawcą?
+
+SELECT c.name AS category, s.company_name AS supplier, COUNT(p.product_id) AS total_products
+FROM products p
+JOIN categories c ON p.category_id = c.category_id
+JOIN suppliers s ON p.supplier_id = s.supplier_id
+GROUP BY c.name, s.company_name
+ORDER BY c.name;
+
+Cel: sprawdzenie FK products.category_id i products.supplier_id oraz agregacji danych.
+
+
+
+Ile produktów jest dostępnych w każdym magazynie (inventory)?
+
+SELECT l.location_code, l.location_type, SUM(i.quantity) AS total_quantity
+FROM inventory i
+JOIN locations l ON i.location_id = l.location_id
+GROUP BY l.location_code, l.location_type
+ORDER BY l.location_code;
+
+Cel: sprawdzenie spójności inventory.location_id i sumowania stanów magazynowych.
+
+
+
+Jakie zamówienia klientów są w trakcie realizacji i ile produktów mają do wysyłki?
+
+SELECT sh.shipment_id, c.company_name AS client, sh.status, SUM(sd.quantity_to_ship) AS total_quantity
+FROM shipments sh
+JOIN clients c ON sh.client_id = c.client_id
+JOIN shipment_details sd ON sh.shipment_id = sd.shipment_id
+WHERE sh.status = 'W trakcie'
+GROUP BY sh.shipment_id, c.company_name, sh.status
+ORDER BY sh.shipment_id;
+
+Cel: sprawdzenie FK shipment_details.shipment_id i shipments.client_id, weryfikacja statusów i agregacji.
+
+
+
+Które dokumenty przyjęcia (receipts) mają różnice między ilością oczekiwaną a faktycznie odebraną?
+
+SELECT r.receipt_id, s.company_name AS supplier, SUM(rd.expected_quantity - rd.received_quantity) AS difference
+FROM receipts r
+JOIN suppliers s ON r.supplier_id = s.supplier_id
+JOIN receipt_details rd ON r.receipt_id = rd.receipt_id
+GROUP BY r.receipt_id, s.company_name
+HAVING SUM(rd.expected_quantity - rd.received_quantity) != 0;
+
+Cel: test integralności danych w receipt_details i sprawdzenie zgodności ilości.
+
+
+
+Jakie produkty są dostępne u ilu dostawców i w ilu magazynach?
+
+SELECT p.name AS product, COUNT(DISTINCT p.supplier_id) AS supplier_count,
+       COUNT(DISTINCT i.location_id) AS location_count
+FROM products p
+LEFT JOIN inventory i ON p.product_id = i.product_id
+GROUP BY p.name
+ORDER BY product;
+
+Cel: sprawdzenie powiązań między produktami, dostawcami i magazynami; wykrycie produktów, które nie mają stanów w magazynie.
