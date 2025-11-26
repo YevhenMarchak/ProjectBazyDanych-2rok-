@@ -1,13 +1,13 @@
 package model;
 
-public class suppliers {
+public class Suppliers {
     private int supplier_id;
     private String company_name;
     private String address;
     private int phone;
     private String email;
     private int tax_id;
-    public suppliers(int supplier_id, String company_name, String address, int phone, String email, int tax_id)
+    public Suppliers(int supplier_id, String company_name, String address, int phone, String email, int tax_id)
     {
         this.supplier_id = supplier_id;
         this.company_name = company_name;
