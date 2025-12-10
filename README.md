@@ -57,3 +57,9 @@ W przyszłości system będzie mógł zostać rozszerzony o:
 •	integrację z systemami księgowymi i ERP,
 •	dodanie mechanizmów kontroli uprawnień użytkowników.
 
+/-----------------------------Pytanie z zajęcia 27.11.2025-------------------------------------------------\
+Czy może jeden pracownik mieć wiele paczek?
+Odpowiedź: tak może bo obsługiwać wiele przyjęć towaru (receipts) bo w tabeli receipts mamy układ wiele-do-jednego,
+czyli jeden pracownik może obsłużyć dowolną liczbę przyjęć (receipts).
+
+
