@@ -1,62 +1,80 @@
-Ile produktów mamy w każdej kategorii i kto jest ich dostawcą?
+1. Ile produktów mamy w każdej kategorii, kto jest ich dostawcą, i jaka jest łączna waga produktów w tej kategorii od danego dostawcy?
 
-SELECT c.name AS category, s.company_name AS supplier, COUNT(p.product_id) AS total_products
+SELECT 
+    c.name AS category,
+    s.company_name AS supplier,
+    COUNT(DISTINCT p.product_id) AS total_products,
+    SUM(p.weight) AS total_weight
 FROM products p
 JOIN categories c ON p.category_id = c.category_id
 JOIN suppliers s ON p.supplier_id = s.supplier_id
+JOIN inventory i ON p.product_id = i.product_id
 GROUP BY c.name, s.company_name
-ORDER BY c.name;
+ORDER BY c.name, s.company_name;
 
-Cel: sprawdzenie FK products.category_id i products.supplier_id oraz agregacji danych.
+Cel: sprawdzenie poprawności powiązań products.category_id, products.supplier_id i inventory.product_id, użycie agregacji wielopoziomowej (COUNT DISTINCT, SUM), analiza kategorii z perspektywy dostawców i parametrów produktów.
 
+2. Ile produktów jest dostępnych w każdym magazynie, oraz jaki procent jego maksymalnej pojemności jest zajęty?
 
-
-Ile produktów jest dostępnych w każdym magazynie (inventory)?
-
-SELECT l.location_code, l.location_type, SUM(i.quantity) AS total_quantity
+SELECT 
+    l.location_code,
+    l.location_type,
+    SUM(i.quantity) AS total_quantity,
+    ROUND( (SUM(i.quantity) / NULLIF(l.max_capacity, 0)) * 100 , 2 ) AS capacity_usage_percent
 FROM inventory i
 JOIN locations l ON i.location_id = l.location_id
-GROUP BY l.location_code, l.location_type
-ORDER BY l.location_code;
+WHERE i.quantity > 0
+GROUP BY l.location_id
+ORDER BY capacity_usage_percent DESC;
 
-Cel: sprawdzenie spójności inventory.location_id i sumowania stanów magazynowych.
+Cel: sprawdzenie spójności inventory.location_id, obliczenie wykorzystania pojemności magazynu, filtrowanie danych, agregacja SUM oraz analiza relacji między stanami magazynowymi a parametrami lokalizacji.
 
+3. Jakie zamówienia klientów są w trakcie realizacji, ile produktów mają do wysyłki oraz kiedy ostatnio zmieniono ich status (max shipment_date)?
 
-
-Jakie zamówienia klientów są w trakcie realizacji i ile produktów mają do wysyłki?
-
-SELECT sh.shipment_id, c.company_name AS client, sh.status, SUM(sd.quantity_to_ship) AS total_quantity
+SELECT 
+    sh.shipment_id,
+    c.company_name AS client,
+    sh.status,
+    COUNT(DISTINCT sd.product_id) AS product_count,
+    SUM(sd.quantity_to_ship) AS total_quantity,
+    MAX(sh.shipment_date) AS last_update
 FROM shipments sh
 JOIN clients c ON sh.client_id = c.client_id
 JOIN shipment_details sd ON sh.shipment_id = sd.shipment_id
 WHERE sh.status = 'W trakcie'
 GROUP BY sh.shipment_id, c.company_name, sh.status
-ORDER BY sh.shipment_id;
+ORDER BY last_update DESC;
 
-Cel: sprawdzenie FK shipment_details.shipment_id i shipments.client_id, weryfikacja statusów i agregacji.
+Cel: sprawdzenie relacji shipments.client_id oraz shipment_details.shipment_id, analiza zamówień według statusów, agregacja danych o liczbie produktów i ilościach do wysyłki, kontrola aktualności danych poprzez MAX(shipment_date).
 
+4. Które dokumenty przyjęcia mają różnice między ilością oczekiwaną a faktycznie odebraną, ile produktów obejmuje ta różnica oraz jaka jest łączna suma rozbieżności?
 
-
-Które dokumenty przyjęcia (receipts) mają różnice między ilością oczekiwaną a faktycznie odebraną?
-
-SELECT r.receipt_id, s.company_name AS supplier, SUM(rd.expected_quantity - rd.received_quantity) AS difference
+SELECT 
+    r.receipt_id,
+    s.company_name AS supplier,
+    COUNT(rd.product_id) AS products_with_difference,
+    SUM(rd.expected_quantity - rd.received_quantity) AS difference,
+    SUM(ABS(rd.expected_quantity - rd.received_quantity)) AS absolute_difference
 FROM receipts r
 JOIN suppliers s ON r.supplier_id = s.supplier_id
 JOIN receipt_details rd ON r.receipt_id = rd.receipt_id
 GROUP BY r.receipt_id, s.company_name
-HAVING SUM(rd.expected_quantity - rd.received_quantity) != 0;
-
-Cel: test integralności danych w receipt_details i sprawdzenie zgodności ilości.
-
+HAVING SUM(rd.expected_quantity - rd.received_quantity) != 0
+ORDER BY absolute_difference DESC;
 
 
-Jakie produkty są dostępne u ilu dostawców i w ilu magazynach?
+Cel: test integralności danych w receipt_details, rozszerzone sprawdzenie zgodności ilości oczekiwanej i odebranej, dodanie informacji o liczbie pozycji z różnicami oraz obliczenie rzeczywistej sumy rozbieżności, a także identyfikacja dokumentów z największymi odchyleniami.
 
-SELECT p.name AS product, COUNT(DISTINCT p.supplier_id) AS supplier_count,
-       COUNT(DISTINCT i.location_id) AS location_count
+5. Jakie produkty są oferowane przez ilu dostawców, w ilu magazynach występują i jaki jest całkowity zapas w firmie?
+
+SELECT 
+    p.name AS product,
+    COUNT(DISTINCT p.supplier_id) AS supplier_count,
+    COUNT(DISTINCT i.location_id) AS location_count,
+    COALESCE(SUM(i.quantity), 0) AS total_stock
 FROM products p
 LEFT JOIN inventory i ON p.product_id = i.product_id
 GROUP BY p.name
-ORDER BY product;
+ORDER BY total_stock DESC;
 
-Cel: sprawdzenie powiązań między produktami, dostawcami i magazynami; wykrycie produktów, które nie mają stanów w magazynie.
+Cel: sprawdzenie relacji między produktami, dostawcami i magazynami, wykorzystanie LEFT JOIN do uwzględnienia produktów bez stanów, agregacja liczby dostawców, liczby lokalizacji i ilości zapasów, analiza dostępności produktów.
