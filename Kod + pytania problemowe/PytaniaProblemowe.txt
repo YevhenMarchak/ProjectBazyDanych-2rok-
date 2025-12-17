@@ -209,7 +209,7 @@ $$;
 
 
 Wywolanie:
-SELECT check_location_capacity(3);
+SELECT check_location_capacity(1);
 
 ====================================================================================================
 
@@ -238,7 +238,7 @@ END;
 $$;
 
 Wywolanie:
-CALL update_inventory_after_receipt(8);
+CALL update_inventory_after_receipt(1);
 
 ====================================================================================================
 
@@ -348,4 +348,5 @@ $$;
 
 Wywolanie:
 SELECT validate_receipt(12);
+
 
