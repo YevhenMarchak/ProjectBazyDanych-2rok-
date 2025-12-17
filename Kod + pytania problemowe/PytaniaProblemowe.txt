@@ -1,276 +1,350 @@
-1. Ile produktów mamy w każdej kategorii, kto jest ich dostawcą, i jaka jest łączna waga produktów w tej kategorii od danego dostawcy?
+1. Premia dla pracowników za obsłużone wysyłki
+Opis problemu:
+Firma chce przyznać premię pracownikom w zależności od liczby wysyłek obsłużonych w danym miesiącu.
 
-SELECT 
-    c.name AS category,
-    s.company_name AS supplier,
-    COUNT(DISTINCT p.product_id) AS total_products,
-    SUM(p.weight) AS total_weight
-FROM products p
-JOIN categories c ON p.category_id = c.category_id
-JOIN suppliers s ON p.supplier_id = s.supplier_id
-JOIN inventory i ON p.product_id = i.product_id
-GROUP BY c.name, s.company_name
-ORDER BY c.name, s.company_name;
+Kroki:
+1.Wyszukać pracowników, którzy realizowali wysyłki w danym miesiącu.
+2.Policzyć liczbę wysyłek dla każdego pracownika.
+3.Na podstawie liczby wysyłek wyznaczyć procent premii.
 
-Cel: sprawdzenie poprawności powiązań products.category_id, products.supplier_id i inventory.product_id, użycie agregacji wielopoziomowej (COUNT DISTINCT, SUM), analiza kategorii z perspektywy dostawców i parametrów produktów.
-
-2. Ile produktów jest dostępnych w każdym magazynie, oraz jaki procent jego maksymalnej pojemności jest zajęty?
-
-SELECT 
-    l.location_code,
-    l.location_type,
-    SUM(i.quantity) AS total_quantity,
-    ROUND( (SUM(i.quantity) / NULLIF(l.max_capacity, 0)) * 100 , 2 ) AS capacity_usage_percent
-FROM inventory i
-JOIN locations l ON i.location_id = l.location_id
-WHERE i.quantity > 0
-GROUP BY l.location_id
-ORDER BY capacity_usage_percent DESC;
-
-Cel: sprawdzenie spójności inventory.location_id, obliczenie wykorzystania pojemności magazynu, filtrowanie danych, agregacja SUM oraz analiza relacji między stanami magazynowymi a parametrami lokalizacji.
-
-3. Jakie zamówienia klientów są w trakcie realizacji, ile produktów mają do wysyłki oraz kiedy ostatnio zmieniono ich status (max shipment_date)?
-
-SELECT 
-    sh.shipment_id,
-    c.company_name AS client,
-    sh.status,
-    COUNT(DISTINCT sd.product_id) AS product_count,
-    SUM(sd.quantity_to_ship) AS total_quantity,
-    MAX(sh.shipment_date) AS last_update
-FROM shipments sh
-JOIN clients c ON sh.client_id = c.client_id
-JOIN shipment_details sd ON sh.shipment_id = sd.shipment_id
-WHERE sh.status = 'W trakcie'
-GROUP BY sh.shipment_id, c.company_name, sh.status
-ORDER BY last_update DESC;
-
-Cel: sprawdzenie relacji shipments.client_id oraz shipment_details.shipment_id, analiza zamówień według statusów, agregacja danych o liczbie produktów i ilościach do wysyłki, kontrola aktualności danych poprzez MAX(shipment_date).
-
-4. Które dokumenty przyjęcia mają różnice między ilością oczekiwaną a faktycznie odebraną, ile produktów obejmuje ta różnica oraz jaka jest łączna suma rozbieżności?
-
-SELECT 
-    r.receipt_id,
-    s.company_name AS supplier,
-    COUNT(rd.product_id) AS products_with_difference,
-    SUM(rd.expected_quantity - rd.received_quantity) AS difference,
-    SUM(ABS(rd.expected_quantity - rd.received_quantity)) AS absolute_difference
-FROM receipts r
-JOIN suppliers s ON r.supplier_id = s.supplier_id
-JOIN receipt_details rd ON r.receipt_id = rd.receipt_id
-GROUP BY r.receipt_id, s.company_name
-HAVING SUM(rd.expected_quantity - rd.received_quantity) != 0
-ORDER BY absolute_difference DESC;
-
-
-Cel: test integralności danych w receipt_details, rozszerzone sprawdzenie zgodności ilości oczekiwanej i odebranej, dodanie informacji o liczbie pozycji z różnicami oraz obliczenie rzeczywistej sumy rozbieżności, a także identyfikacja dokumentów z największymi odchyleniami.
-
-5. Jakie produkty są oferowane przez ilu dostawców, w ilu magazynach występują i jaki jest całkowity zapas w firmie?
-
-SELECT 
-    p.name AS product,
-    COUNT(DISTINCT p.supplier_id) AS supplier_count,
-    COUNT(DISTINCT i.location_id) AS location_count,
-    COALESCE(SUM(i.quantity), 0) AS total_stock
-FROM products p
-LEFT JOIN inventory i ON p.product_id = i.product_id
-GROUP BY p.name
-ORDER BY total_stock DESC;
-
-Cel: sprawdzenie relacji między produktami, dostawcami i magazynami, wykorzystanie LEFT JOIN do uwzględnienia produktów bez stanów, agregacja liczby dostawców, liczby lokalizacji i ilości zapasów, analiza dostępności produktów.
-
-
-
-1. Procedura
-CREATE OR REPLACE PROCEDURE raport_produkty_kategorie()
+CREATE OR REPLACE FUNCTION calculate_employee_bonus(
+    p_month INT,
+    p_year INT
+)
+RETURNS TABLE(employee_id BIGINT, shipments_count INT, bonus_percent INT)
 LANGUAGE plpgsql
 AS $$
 BEGIN
-    DROP TABLE IF EXISTS temp_kategorie_raport;
-
-    CREATE TEMP TABLE temp_kategorie_raport (
-        category TEXT,
-        supplier TEXT,
-        total_products INT,
-        total_weight NUMERIC
-    );
-
-    INSERT INTO temp_kategorie_raport
-    SELECT 
-        c.name AS category,
-        s.company_name AS supplier,
-        COUNT(DISTINCT p.product_id) AS total_products,
-        SUM(p.weight) AS total_weight
-    FROM products p
-    JOIN categories c ON p.category_id = c.category_id
-    JOIN suppliers s ON p.supplier_id = s.supplier_id
-    JOIN inventory i ON p.product_id = i.product_id
-    GROUP BY c.name, s.company_name
-    ORDER BY c.name, s.company_name;
-
-    RAISE NOTICE 'Raport został wygenerowany %', NOW();
+    RETURN QUERY
+    SELECT
+        s.employee_id,
+        COUNT(s.shipment_id)::INT,
+        CASE
+            WHEN COUNT(s.shipment_id) > 100 THEN 30
+            WHEN COUNT(s.shipment_id) BETWEEN 50 AND 100 THEN 15
+            ELSE 0
+        END
+    FROM shipments s
+    WHERE EXTRACT(MONTH FROM s.shipment_date) = p_month
+      AND EXTRACT(YEAR FROM s.shipment_date) = p_year
+    GROUP BY s.employee_id;
 END;
 $$;
 
-Uruchomienie procedury:
-CALL raport_produkty_kategorie();
+Wywolanie:
+SELECT * 
+FROM calculate_employee_bonus(10, 2024);
 
-Dane tutaj:
-SELECT * FROM temp_kategorie_raport;
+====================================================================================================
 
-2. Procedura:
-CREATE OR REPLACE PROCEDURE raport_magazyny_pojemnosc()
+2. Automatyczne oznaczanie przeterminowanych wysyłek
+Opis problemu:
+Wysyłki starsze niż 7 dni i niezrealizowane powinny zostać automatycznie oznaczone jako przeterminowane.
+
+Kroki:
+1.Wyszukać wysyłki starsze niż 7 dni.
+2.Sprawdzić ich aktualny status.
+3.Zaktualizować status na OVERDUE.
+
+CREATE OR REPLACE PROCEDURE mark_overdue_shipments()
 LANGUAGE plpgsql
 AS $$
 BEGIN
-    DROP TABLE IF EXISTS temp_magazyny_raport;
+    UPDATE shipments
+    SET status = 'OVERDUE'
+    WHERE shipment_date < CURRENT_DATE - INTERVAL '7 days'
+      AND status <> 'DELIVERED';
+END;
+$$;
 
-    CREATE TEMP TABLE temp_magazyny_raport (
-        location_code TEXT,
-        location_type TEXT,
-        total_quantity INT,
-        capacity_usage_percent NUMERIC(10,2)
-    );
+Wywolanie:
+CALL mark_overdue_shipments();
 
-    INSERT INTO temp_magazyny_raport
-    SELECT 
-        l.location_code,
-        l.location_type,
-        SUM(i.quantity) AS total_quantity,
-        ROUND( (SUM(i.quantity) / NULLIF(l.max_capacity, 0)) * 100 , 2 ) AS capacity_usage_percent
+====================================================================================================
+
+3. Wykrywanie braków magazynowych
+Opis problemu:
+System powinien wskazywać produkty, których ilość w magazynie spadła poniżej ustalonego minimum.
+
+Kroki:
+1.Pobranie aktualnych stanów magazynowych.
+2.Porównanie ilości z progiem minimalnym.
+3.Zwrócenie produktów wymagających uzupełnienia.
+
+CREATE OR REPLACE FUNCTION find_low_stock_products(
+    p_min_quantity NUMERIC
+)
+RETURNS TABLE(
+    product_id BIGINT,
+    location_id BIGINT,
+    quantity NUMERIC
+)
+LANGUAGE plpgsql
+AS $$
+BEGIN
+    RETURN QUERY
+    SELECT
+        i.product_id,
+        i.location_id,
+        i.quantity
     FROM inventory i
-    JOIN locations l ON i.location_id = l.location_id
-    WHERE i.quantity > 0
-    GROUP BY l.location_id
-    ORDER BY capacity_usage_percent DESC;
-
-    RAISE NOTICE 'Raport magazynów wygenerowany: %', NOW();
+    WHERE i.quantity < p_min_quantity;
 END;
 $$;
 
-Uruchomienie:
-CALL raport_magazyny_pojemnosc();
-SELECT * FROM temp_magazyny_raport;
+Wywolanie:
+SELECT *
+FROM find_low_stock_products(10);
 
-3. Procedura:
-CREATE OR REPLACE PROCEDURE raport_zamowienia_w_trakcie()
+====================================================================================================
+
+4. Obliczenie stopnia realizacji dostawy
+Opis problemu:
+Chcemy określić procent realizacji danej dostawy (receipt).
+
+Kroki:
+1.Pobranie expected_quantity i received_quantity.
+2.Zsumowanie ilości dla całej dostawy.
+3.Obliczenie procentu realizacji.
+
+CREATE OR REPLACE FUNCTION receipt_completion_percentage(
+    p_receipt_id BIGINT
+)
+RETURNS NUMERIC
 LANGUAGE plpgsql
 AS $$
 DECLARE
-    liczba INT;
+    expected_sum NUMERIC;
+    received_sum NUMERIC;
 BEGIN
-    DROP TABLE IF EXISTS temp_zamowienia_trwajace;
+    SELECT SUM(expected_quantity), SUM(received_quantity)
+    INTO expected_sum, received_sum
+    FROM receipt_details
+    WHERE receipt_id = p_receipt_id;
 
-    CREATE TEMP TABLE temp_zamowienia_trwajace (
-        shipment_id INT,
-        client TEXT,
-        status TEXT,
-        product_count INT,
-        total_quantity INT,
-        last_update TIMESTAMP
-    );
-
-    SELECT COUNT(*) INTO liczba FROM shipments WHERE status = 'W trakcie';
-    IF liczba = 0 THEN
-        RAISE NOTICE 'Brak zamówień o statusie W trakcie.';
-        RETURN;
+    IF expected_sum = 0 THEN
+        RETURN 0;
     END IF;
 
-    INSERT INTO temp_zamowienia_trwajace
-    SELECT 
-        sh.shipment_id,
-        c.company_name AS client,
-        sh.status,
-        COUNT(DISTINCT sd.product_id) AS product_count,
-        SUM(sd.quantity_to_ship) AS total_quantity,
-        MAX(sh.shipment_date) AS last_update
-    FROM shipments sh
-    JOIN clients c ON sh.client_id = c.client_id
-    JOIN shipment_details sd ON sh.shipment_id = sd.shipment_id
-    WHERE sh.status = 'W trakcie'
-    GROUP BY sh.shipment_id, c.company_name, sh.status
-    ORDER BY last_update DESC;
-
-    RAISE NOTICE 'Raport zamówień wygenerowany: %', NOW();
+    RETURN (received_sum / expected_sum) * 100;
 END;
 $$;
 
-Uruchomienie:
-CALL raport_zamowienia_w_trakcie();
-SELECT * FROM temp_zamowienia_trwajace;
+Wywolanie:
+SELECT receipt_completion_percentage(5);
 
-4. Procedura:
-CREATE OR REPLACE PROCEDURE raport_rozbieznosci_przyjec()
+====================================================================================================
+
+5. Najaktywniejsi klienci w danym okresie
+Opis problemu:
+Firma chce zidentyfikować klientów generujących największą liczbę wysyłek.
+
+Kroki:
+1.Pobranie wysyłek z danego okresu.
+2.Zliczenie wysyłek dla klientów.
+3.Wybranie klientów przekraczających ustalony próg.
+
+CREATE OR REPLACE FUNCTION get_top_clients(
+    p_from DATE,
+    p_to DATE,
+    p_min_shipments INT
+)
+RETURNS TABLE(
+    client_id BIGINT,
+    shipments_count INT
+)
 LANGUAGE plpgsql
 AS $$
 BEGIN
-    DROP TABLE IF EXISTS temp_rozbieznosci;
+    RETURN QUERY
+    SELECT
+        s.client_id,
+        COUNT(s.shipment_id)::INT
+    FROM shipments s
+    WHERE s.shipment_date BETWEEN p_from AND p_to
+    GROUP BY s.client_id
+    HAVING COUNT(s.shipment_id) >= p_min_shipments;
+END;
+$$;
 
-    CREATE TEMP TABLE temp_rozbieznosci (
-        receipt_id INT,
-        supplier TEXT,
-        products_with_difference INT,
-        difference NUMERIC,
-        absolute_difference NUMERIC,
-        severity_level TEXT
-    );
 
-    INSERT INTO temp_rozbieznosci
-    SELECT 
-        r.receipt_id,
-        s.company_name AS supplier,
-        COUNT(rd.product_id) AS products_with_difference,
-        SUM(rd.expected_quantity - rd.received_quantity) AS difference,
-        SUM(ABS(rd.expected_quantity - rd.received_quantity)) AS absolute_difference,
-        CASE 
-            WHEN SUM(ABS(rd.expected_quantity - rd.received_quantity)) > 100 THEN 'HIGH'
-            WHEN SUM(ABS(rd.expected_quantity - rd.received_quantity)) > 20 THEN 'MEDIUM'
+Wywolanie:
+SELECT *
+FROM get_top_clients('2024-01-01', '2024-12-31', 20);
+
+====================================================================================================
+
+6. Kontrola pojemności lokalizacji magazynowej
+Opis problemu:
+System powinien sprawdzić, czy dana lokalizacja magazynowa nie została przepełniona.
+
+Kroki:
+1.Zsumowanie ilości produktów w lokalizacji.
+2.Pobranie maksymalnej pojemności lokalizacji.
+3.Porównanie wartości i zwrócenie wyniku.
+
+CREATE OR REPLACE FUNCTION check_location_capacity(
+    p_location_id BIGINT
+)
+RETURNS BOOLEAN
+LANGUAGE plpgsql
+AS $$
+DECLARE
+    total_quantity NUMERIC;
+    v_max_capacity NUMERIC;
+BEGIN
+    SELECT SUM(i.quantity)
+    INTO total_quantity
+    FROM inventory i
+    WHERE i.location_id = p_location_id;
+
+    SELECT l.max_capacity
+    INTO v_max_capacity
+    FROM locations l
+    WHERE l.location_id = p_location_id;
+
+    RETURN total_quantity <= v_max_capacity;
+END;
+$$;
+
+
+Wywolanie:
+SELECT check_location_capacity(3);
+
+====================================================================================================
+
+7. Aktualizacja stanu magazynu po przyjęciu dostawy
+Opis problemu:
+Po przyjęciu dostawy system musi zaktualizować stany magazynowe.
+
+Kroki:
+1.Pobranie danych z receipt_details.
+2.Dopasowanie produktów do inventory.
+3.Aktualizacja ilości i daty modyfikacji.
+
+CREATE OR REPLACE PROCEDURE update_inventory_after_receipt(
+    p_receipt_id BIGINT
+)
+LANGUAGE plpgsql
+AS $$
+BEGIN
+    UPDATE inventory i
+    SET quantity = i.quantity + rd.received_quantity,
+        last_updated = NOW()
+    FROM receipt_details rd
+    WHERE rd.receipt_id = p_receipt_id
+      AND rd.product_id = i.product_id;
+END;
+$$;
+
+Wywolanie:
+CALL update_inventory_after_receipt(8);
+
+====================================================================================================
+
+8. Ocena produktywności pracowników
+Opis problemu:
+Chcemy określić produktywność pracowników na podstawie liczby obsłużonych klientów.
+
+Kroki:
+1.Pobranie wysyłek pracowników.
+2.Zliczenie unikalnych klientów.
+3.Określenie poziomu produktywności.
+
+CREATE OR REPLACE FUNCTION employee_productivity()
+RETURNS TABLE(
+    employee_id BIGINT,
+    clients_count INT,
+    productivity_level TEXT
+)
+LANGUAGE plpgsql
+AS $$
+BEGIN
+    RETURN QUERY
+    SELECT
+        s.employee_id,
+        COUNT(DISTINCT s.client_id)::INT AS clients_count,
+        CASE
+            WHEN COUNT(DISTINCT s.client_id) > 20 THEN 'HIGH'
+            WHEN COUNT(DISTINCT s.client_id) BETWEEN 10 AND 20 THEN 'MEDIUM'
             ELSE 'LOW'
-        END AS severity_level
-    FROM receipts r
-    JOIN suppliers s ON r.supplier_id = s.supplier_id
-    JOIN receipt_details rd ON r.receipt_id = rd.receipt_id
-    GROUP BY r.receipt_id, s.company_name
-    HAVING SUM(rd.expected_quantity - rd.received_quantity) != 0
-    ORDER BY absolute_difference DESC;
-
-    RAISE NOTICE 'Raport rozbieżności wygenerowany: %', NOW();
+        END AS productivity_level
+    FROM shipments s
+    GROUP BY s.employee_id;
 END;
 $$;
 
-Uruchomienie:
-CALL raport_rozbieznosci_przyjec();
-SELECT * FROM temp_rozbieznosci;
 
-5. Procedura:
-CREATE OR REPLACE PROCEDURE raport_produkty_dostawy_magazyny()
+Wywolanie:
+SELECT *
+FROM employee_productivity();
+
+====================================================================================================
+
+9. Najczęściej wysyłane produkty
+Opis problemu:
+Firma chce zidentyfikować produkty kluczowe pod względem wysyłek.
+
+Kroki:
+1.Pobranie danych z shipment_details.
+2.Zsumowanie wysyłanych ilości.
+3.Wybranie produktów przekraczających próg.
+
+CREATE OR REPLACE FUNCTION most_shipped_products(
+    p_min_quantity NUMERIC
+)
+RETURNS TABLE(
+    product_id BIGINT,
+    total_quantity NUMERIC
+)
 LANGUAGE plpgsql
 AS $$
 BEGIN
-    DROP TABLE IF EXISTS temp_produkty_raport;
-
-    CREATE TEMP TABLE temp_produkty_raport (
-        product TEXT,
-        supplier_count INT,
-        location_count INT,
-        total_stock INT
-    );
-
-    INSERT INTO temp_produkty_raport
-    SELECT 
-        p.name AS product,
-        COUNT(DISTINCT p.supplier_id) AS supplier_count,
-        COUNT(DISTINCT i.location_id) AS location_count,
-        COALESCE(SUM(i.quantity), 0) AS total_stock
-    FROM products p
-    LEFT JOIN inventory i ON p.product_id = i.product_id
-    GROUP BY p.name
-    ORDER BY total_stock DESC;
-
-    RAISE NOTICE 'Raport produktów wygenerowany: %', NOW();
+    RETURN QUERY
+    SELECT
+        sd.product_id,
+        SUM(sd.quantity_to_ship) AS total_quantity
+    FROM shipment_details sd
+    GROUP BY sd.product_id
+    HAVING SUM(sd.quantity_to_ship) >= p_min_quantity;
 END;
 $$;
 
-Uruchomienie:
-CALL raport_produkty_dostawy_magazyny();
-SELECT * FROM temp_produkty_raport;
+
+Wywolanie:
+SELECT *
+FROM most_shipped_products(1000);
+
+====================================================================================================
+
+10. Walidacja poprawności dostawy
+Opis problemu:
+System powinien sprawdzić poprawność danych dostawy przed jej zatwierdzeniem.
+
+Kroki:
+1.Pobranie danych o ilościach oczekiwanych i odebranych.
+2.Sprawdzenie poprawności danych.
+3.Zgłoszenie błędu lub zatwierdzenie dostawy.
+
+CREATE OR REPLACE FUNCTION validate_receipt(
+    p_receipt_id BIGINT
+)
+RETURNS BOOLEAN
+LANGUAGE plpgsql
+AS $$
+BEGIN
+    IF EXISTS (
+        SELECT 1
+        FROM receipt_details
+        WHERE receipt_id = p_receipt_id
+          AND received_quantity > expected_quantity
+    ) THEN
+        RETURN FALSE;
+    END IF;
+
+    RETURN TRUE;
+END;
+$$;
+
+Wywolanie:
+SELECT validate_receipt(12);
