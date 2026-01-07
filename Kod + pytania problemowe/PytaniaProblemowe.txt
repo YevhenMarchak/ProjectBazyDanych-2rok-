@@ -7,33 +7,81 @@ Kroki:
 2.Policzyć liczbę wysyłek dla każdego pracownika.
 3.Na podstawie liczby wysyłek wyznaczyć procent premii.
 
-CREATE OR REPLACE FUNCTION calculate_employee_bonus(
+===============================Copy-Paste(DANE)===============================
+
+BEGIN;
+
+DELETE FROM public.shipments;
+DELETE FROM public.clients;
+DELETE FROM public.employees;
+
+INSERT INTO public.employees (employee_id, first_name, last_name, position, hire_date)
+VALUES
+(1, 'Jan',  'Kowalski', 'Magazynier',  '2022-01-10'),
+(2, 'Anna', 'Nowak',    'Koordynator', '2023-03-15');
+
+INSERT INTO public.clients (client_id, company_name)
+VALUES
+(1, 'Firma A'),
+(2, 'Firma B');
+
+-- pracownik 1 → 60 wysyłek → 15% premii
+INSERT INTO public.shipments (shipment_id, client_id, employee_id, shipment_date, status)
+SELECT
+    gs,
+    1,
+    1,
+    DATE '2024-10-05',
+    'SENT'
+FROM generate_series(1, 60) gs;
+
+-- pracownik 2 → 10 wysyłek → 0% premii
+INSERT INTO public.shipments (shipment_id, client_id, employee_id, shipment_date, status)
+SELECT
+    gs + 100,
+    2,
+    2,
+    DATE '2024-10-10',
+    'SENT'
+FROM generate_series(1, 10) gs;
+
+COMMIT;
+
+===============================FUNKCJA===============================
+
+CREATE OR REPLACE FUNCTION public.calculate_employee_bonus(
     p_month INT,
     p_year INT
 )
-RETURNS TABLE(employee_id BIGINT, shipments_count INT, bonus_percent INT)
+RETURNS TABLE (
+    employee_id BIGINT,
+    shipments_count INT,
+    bonus_percent INT
+)
 LANGUAGE plpgsql
 AS $$
 BEGIN
     RETURN QUERY
     SELECT
         s.employee_id,
-        COUNT(s.shipment_id)::INT,
+        COUNT(*)::INT AS shipments_count,
         CASE
-            WHEN COUNT(s.shipment_id) > 100 THEN 30
-            WHEN COUNT(s.shipment_id) BETWEEN 50 AND 100 THEN 15
+            WHEN COUNT(*) > 100 THEN 30
+            WHEN COUNT(*) BETWEEN 50 AND 100 THEN 15
             ELSE 0
-        END
-    FROM shipments s
+        END AS bonus_percent
+    FROM public.shipments s
     WHERE EXTRACT(MONTH FROM s.shipment_date) = p_month
-      AND EXTRACT(YEAR FROM s.shipment_date) = p_year
+      AND EXTRACT(YEAR  FROM s.shipment_date) = p_year
+      AND s.employee_id IS NOT NULL
     GROUP BY s.employee_id;
 END;
 $$;
 
-Wywolanie:
-SELECT * 
-FROM calculate_employee_bonus(10, 2024);
+===============================Wywolanie:===============================
+
+SELECT *
+FROM public.calculate_employee_bonus(10, 2024);
 
 ====================================================================================================
 
@@ -46,19 +94,60 @@ Kroki:
 2.Sprawdzić ich aktualny status.
 3.Zaktualizować status na OVERDUE.
 
-CREATE OR REPLACE PROCEDURE mark_overdue_shipments()
+===============================Copy-Paste(DANE)===============================
+
+BEGIN;
+
+-- =====================================
+-- CZYSZCZENIE DANYCH TESTOWYCH
+-- =====================================
+DELETE FROM public.shipments;
+DELETE FROM public.clients;
+DELETE FROM public.employees;
+
+-- pracownik
+INSERT INTO public.employees (employee_id, first_name, last_name, position, hire_date)
+VALUES (1, 'Jan', 'Kowalski', 'Magazynier', '2022-01-10');
+
+-- klient
+INSERT INTO public.clients (client_id, company_name)
+VALUES (1, 'Firma Testowa');
+
+INSERT INTO public.shipments (shipment_id, client_id, employee_id, shipment_date, status)
+VALUES (1, 1, 1, CURRENT_DATE - INTERVAL '10 days', 'SENT');
+
+INSERT INTO public.shipments (shipment_id, client_id, employee_id, shipment_date, status)
+VALUES (2, 1, 1, CURRENT_DATE - INTERVAL '8 days', 'IN_PROGRESS');
+
+INSERT INTO public.shipments (shipment_id, client_id, employee_id, shipment_date, status)
+VALUES (3, 1, 1, CURRENT_DATE - INTERVAL '12 days', 'DELIVERED');
+
+INSERT INTO public.shipments (shipment_id, client_id, employee_id, shipment_date, status)
+VALUES (4, 1, 1, CURRENT_DATE - INTERVAL '2 days', 'SENT');
+
+COMMIT;
+
+===============================PROCEDURA===============================
+
+CREATE OR REPLACE PROCEDURE public.mark_overdue_shipments()
 LANGUAGE plpgsql
 AS $$
 BEGIN
-    UPDATE shipments
+    UPDATE public.shipments
     SET status = 'OVERDUE'
     WHERE shipment_date < CURRENT_DATE - INTERVAL '7 days'
       AND status <> 'DELIVERED';
 END;
 $$;
 
-Wywolanie:
-CALL mark_overdue_shipments();
+===============================Wywolanie===============================
+
+CALL public.mark_overdue_shipments();
+
+===============================Wynik===============================
+SELECT shipment_id, shipment_date, status
+FROM public.shipments
+ORDER BY shipment_id;
 
 ====================================================================================================
 
@@ -71,10 +160,40 @@ Kroki:
 2.Porównanie ilości z progiem minimalnym.
 3.Zwrócenie produktów wymagających uzupełnienia.
 
-CREATE OR REPLACE FUNCTION find_low_stock_products(
+===============================Copy-Paste(DANE)===============================
+
+DELETE FROM public.inventory;
+DELETE FROM public.products;
+DELETE FROM public.locations;
+DELETE FROM public.categories;
+
+INSERT INTO public.categories (category_id, name)
+VALUES (1, 'Kategoria testowa');
+
+INSERT INTO public.locations (location_id, location_code, location_type, max_capacity)
+VALUES
+(1, 'A-01', 'RACK', 100),
+(2, 'B-01', 'RACK', 200);
+
+INSERT INTO public.products (product_id, sku, name, category_id)
+VALUES
+(1, 'SKU-001', 'Produkt A', 1),
+(2, 'SKU-002', 'Produkt B', 1),
+(3, 'SKU-003', 'Produkt C', 1);
+
+INSERT INTO public.inventory (inventory_id, product_id, location_id, quantity)
+VALUES
+(1, 1, 1, 5),
+(2, 2, 1, 50),
+(3, 3, 2, 8);
+
+
+===============================FUNCKJA===============================
+
+CREATE OR REPLACE FUNCTION public.find_low_stock_products(
     p_min_quantity NUMERIC
 )
-RETURNS TABLE(
+RETURNS TABLE (
     product_id BIGINT,
     location_id BIGINT,
     quantity NUMERIC
@@ -87,14 +206,15 @@ BEGIN
         i.product_id,
         i.location_id,
         i.quantity
-    FROM inventory i
+    FROM public.inventory i
     WHERE i.quantity < p_min_quantity;
 END;
 $$;
 
-Wywolanie:
+===============================Wywolanie:===============================
+
 SELECT *
-FROM find_low_stock_products(10);
+FROM public.find_low_stock_products(10::NUMERIC);
 
 ====================================================================================================
 
@@ -107,31 +227,73 @@ Kroki:
 2.Zsumowanie ilości dla całej dostawy.
 3.Obliczenie procentu realizacji.
 
-CREATE OR REPLACE FUNCTION receipt_completion_percentage(
+===============================Copy-Paste(DANE)===============================
+
+DELETE FROM public.receipt_details;
+DELETE FROM public.receipts;
+
+DELETE FROM public.inventory;
+DELETE FROM public.products;
+DELETE FROM public.categories;
+
+DELETE FROM public.suppliers;
+DELETE FROM public.employees;
+
+INSERT INTO public.categories (category_id, name)
+VALUES (1, 'Kategoria testowa');
+
+INSERT INTO public.products (product_id, sku, name, category_id)
+VALUES
+(1, 'SKU-001', 'Produkt A', 1),
+(2, 'SKU-002', 'Produkt B', 1);
+
+INSERT INTO public.suppliers (supplier_id, company_name)
+VALUES (1, 'Dostawca Testowy');
+
+
+INSERT INTO public.employees (employee_id, first_name, last_name, position)
+VALUES (1, 'Jan', 'Kowalski', 'Magazynier');
+
+
+INSERT INTO public.receipts (receipt_id, supplier_id, employee_id, receipt_date, status)
+VALUES (1, 1, 1, CURRENT_DATE, 'RECEIVED');
+
+
+INSERT INTO public.receipt_details (receipt_id, product_id, expected_quantity, received_quantity)
+VALUES
+(1, 1, 100, 80),   -- 80%
+(1, 2, 50, 50);    -- 100%
+
+===============================FUNCKJA===============================
+
+CREATE OR REPLACE FUNCTION public.receipt_completion_percentage(
     p_receipt_id BIGINT
 )
 RETURNS NUMERIC
 LANGUAGE plpgsql
 AS $$
 DECLARE
-    expected_sum NUMERIC;
-    received_sum NUMERIC;
+    expected_sum NUMERIC := 0;
+    received_sum NUMERIC := 0;
 BEGIN
-    SELECT SUM(expected_quantity), SUM(received_quantity)
+    SELECT
+        COALESCE(SUM(expected_quantity), 0),
+        COALESCE(SUM(received_quantity), 0)
     INTO expected_sum, received_sum
-    FROM receipt_details
+    FROM public.receipt_details
     WHERE receipt_id = p_receipt_id;
 
     IF expected_sum = 0 THEN
         RETURN 0;
     END IF;
 
-    RETURN (received_sum / expected_sum) * 100;
+    RETURN ROUND((received_sum / expected_sum) * 100, 2);
 END;
 $$;
 
-Wywolanie:
-SELECT receipt_completion_percentage(5);
+===============================Wywolanie:===============================
+
+SELECT public.receipt_completion_percentage(1);
 
 ====================================================================================================
 
@@ -144,12 +306,40 @@ Kroki:
 2.Zliczenie wysyłek dla klientów.
 3.Wybranie klientów przekraczających ustalony próg.
 
-CREATE OR REPLACE FUNCTION get_top_clients(
+===============================Copy-Paste(DANE)===============================
+
+DELETE FROM public.shipments;
+DELETE FROM public.clients;
+
+INSERT INTO public.clients (client_id, company_name)
+VALUES
+(1, 'Firma Alfa'),
+(2, 'Firma Beta'),
+(3, 'Firma Gamma');
+
+-- klient 1 → 5 wysyłek
+INSERT INTO public.shipments (shipment_id, client_id, shipment_date, status)
+VALUES
+(1, 1, '2024-02-10', 'SENT'),
+(2, 1, '2024-03-05', 'SENT'),
+(3, 1, '2024-05-01', 'SENT'),
+(4, 1, '2024-06-15', 'SENT'),
+(5, 1, '2024-10-20', 'SENT');
+
+-- klient 2 → 2 wysyłki
+INSERT INTO public.shipments (shipment_id, client_id, shipment_date, status)
+VALUES
+(6, 2, '2024-04-12', 'SENT'),
+(7, 2, '2024-11-01', 'SENT');
+
+===============================FUNCKJA===============================
+
+CREATE OR REPLACE FUNCTION public.get_top_clients(
     p_from DATE,
     p_to DATE,
     p_min_shipments INT
 )
-RETURNS TABLE(
+RETURNS TABLE (
     client_id BIGINT,
     shipments_count INT
 )
@@ -159,18 +349,18 @@ BEGIN
     RETURN QUERY
     SELECT
         s.client_id,
-        COUNT(s.shipment_id)::INT
-    FROM shipments s
+        COUNT(*)::INT AS shipments_count
+    FROM public.shipments s
     WHERE s.shipment_date BETWEEN p_from AND p_to
     GROUP BY s.client_id
-    HAVING COUNT(s.shipment_id) >= p_min_shipments;
+    HAVING COUNT(*) >= p_min_shipments;
 END;
 $$;
 
+===============================Wywolanie:===============================
 
-Wywolanie:
 SELECT *
-FROM get_top_clients('2024-01-01', '2024-12-31', 1);
+FROM public.get_top_clients('2024-01-01', '2024-12-31', 1);
 
 ====================================================================================================
 
@@ -183,33 +373,80 @@ Kroki:
 2.Pobranie maksymalnej pojemności lokalizacji.
 3.Porównanie wartości i zwrócenie wyniku.
 
-CREATE OR REPLACE FUNCTION check_location_capacity(
+===============================Copy-Paste(DANE)===============================
+
+DELETE FROM public.receipt_details;
+DELETE FROM public.receipts;
+
+DELETE FROM public.inventory;
+
+DELETE FROM public.products;
+DELETE FROM public.categories;
+
+DELETE FROM public.locations;
+
+DELETE FROM public.suppliers;
+DELETE FROM public.employees;
+
+INSERT INTO public.locations (location_id, location_code, location_type, max_capacity)
+VALUES
+(1, 'A-01', 'RACK', 100),   -- limit 100
+(2, 'B-01', 'RACK', 50);    -- limit 50
+
+INSERT INTO public.categories (category_id, name)
+VALUES (1, 'Kategoria testowa');
+
+INSERT INTO public.products (product_id, sku, name, category_id)
+VALUES
+(1, 'SKU-001', 'Produkt A', 1),
+(2, 'SKU-002', 'Produkt B', 1);
+
+-- lokalizacja 1 → 30 + 40 = 70 (OK)
+INSERT INTO public.inventory (inventory_id, product_id, location_id, quantity)
+VALUES
+(1, 1, 1, 30),
+(2, 2, 1, 40);
+
+-- lokalizacja 2 → 30 + 40 = 70 (PRZEPEŁNIONA)
+INSERT INTO public.inventory (inventory_id, product_id, location_id, quantity)
+VALUES
+(3, 1, 2, 30),
+(4, 2, 2, 40);
+
+===============================FUNKCJA===============================
+
+CREATE OR REPLACE FUNCTION public.check_location_capacity(
     p_location_id BIGINT
 )
 RETURNS BOOLEAN
 LANGUAGE plpgsql
 AS $$
 DECLARE
-    total_quantity NUMERIC;
+    total_quantity NUMERIC := 0;
     v_max_capacity NUMERIC;
 BEGIN
-    SELECT SUM(i.quantity)
+    SELECT COALESCE(SUM(i.quantity), 0)
     INTO total_quantity
-    FROM inventory i
+    FROM public.inventory i
     WHERE i.location_id = p_location_id;
 
     SELECT l.max_capacity
     INTO v_max_capacity
-    FROM locations l
+    FROM public.locations l
     WHERE l.location_id = p_location_id;
+
+    -- jeśli brak limitu, uznajemy że OK
+    IF v_max_capacity IS NULL THEN
+        RETURN TRUE;
+    END IF;
 
     RETURN total_quantity <= v_max_capacity;
 END;
 $$;
 
+===============================Wywolanie:===============================
 
-Wywolanie:
-SELECT check_location_capacity(1);
+SELECT public.check_location_capacity(1);
 
 ====================================================================================================
 
@@ -222,23 +459,77 @@ Kroki:
 2.Dopasowanie produktów do inventory.
 3.Aktualizacja ilości i daty modyfikacji.
 
-CREATE OR REPLACE PROCEDURE update_inventory_after_receipt(
+===============================Copy-Paste(DANE)===============================
+
+DELETE FROM public.receipt_details;
+DELETE FROM public.receipts;
+
+DELETE FROM public.inventory;
+
+DELETE FROM public.products;
+DELETE FROM public.categories;
+
+DELETE FROM public.locations;
+
+DELETE FROM public.suppliers;
+DELETE FROM public.employees;
+
+INSERT INTO public.categories (category_id, name)
+VALUES (1, 'Kategoria testowa');
+
+INSERT INTO public.products (product_id, sku, name, category_id)
+VALUES
+(1, 'SKU-001', 'Produkt A', 1),
+(2, 'SKU-002', 'Produkt B', 1);
+
+INSERT INTO public.locations (location_id, location_code, location_type, max_capacity)
+VALUES (1, 'A-01', 'RACK', 500);
+
+INSERT INTO public.inventory (inventory_id, product_id, location_id, quantity)
+VALUES
+(1, 1, 1, 10),   -- Produkt A: 10 szt.
+(2, 2, 1, 20);   -- Produkt B: 20 szt.
+
+INSERT INTO public.suppliers (supplier_id, company_name)
+VALUES (1, 'Dostawca Testowy');
+
+INSERT INTO public.employees (employee_id, first_name, last_name, position)
+VALUES (1, 'Jan', 'Kowalski', 'Magazynier');
+
+INSERT INTO public.receipts (receipt_id, supplier_id, employee_id, receipt_date, status)
+VALUES (1, 1, 1, CURRENT_DATE, 'RECEIVED');
+
+INSERT INTO public.receipt_details (receipt_id, product_id, expected_quantity, received_quantity)
+VALUES
+(1, 1, 100, 30),  -- Produkt A: +30
+(1, 2, 50,  20);  -- Produkt B: +20
+
+===============================PROCEDURA===============================
+
+CREATE OR REPLACE PROCEDURE public.update_inventory_after_receipt(
     p_receipt_id BIGINT
 )
 LANGUAGE plpgsql
 AS $$
 BEGIN
-    UPDATE inventory i
+    UPDATE public.inventory i
     SET quantity = i.quantity + rd.received_quantity,
         last_updated = NOW()
-    FROM receipt_details rd
+    FROM public.receipt_details rd
     WHERE rd.receipt_id = p_receipt_id
       AND rd.product_id = i.product_id;
 END;
 $$;
 
-Wywolanie:
-CALL update_inventory_after_receipt(1);
+===============================Wywolanie===============================
+
+CALL public.update_inventory_after_receipt(1);
+
+===============================Wynik===============================
+
+SELECT product_id, quantity, last_updated
+FROM public.inventory
+ORDER BY product_id;
 
 ====================================================================================================
 
@@ -251,8 +542,74 @@ Kroki:
 2.Zliczenie unikalnych klientów.
 3.Określenie poziomu produktywności.
 
-CREATE OR REPLACE FUNCTION employee_productivity()
-RETURNS TABLE(
+===============================Copy-Paste(DANE)===============================
+
+DELETE FROM public.shipments;
+DELETE FROM public.clients;
+DELETE FROM public.employees;
+
+INSERT INTO public.employees (employee_id, first_name, last_name, position)
+VALUES
+(1, 'Jan',  'Kowalski', 'Magazynier'),
+(2, 'Anna', 'Nowak',    'Koordynator'),
+(3, 'Piotr','Zieliński','Magazynier');
+
+INSERT INTO public.clients (client_id, company_name)
+VALUES
+(1, 'Firma A'),
+(2, 'Firma B'),
+(3, 'Firma C'),
+(4, 'Firma D'),
+(5, 'Firma E'),
+(6, 'Firma F'),
+(7, 'Firma G'),
+(8, 'Firma H'),
+(9, 'Firma I'),
+(10,'Firma J'),
+(11,'Firma K'),
+(12,'Firma L'),
+(13,'Firma M'),
+(14,'Firma N'),
+(15,'Firma O'),
+(16,'Firma P'),
+(17,'Firma Q'),
+(18,'Firma R'),
+(19,'Firma S'),
+(20,'Firma T'),
+(21,'Firma U'),
+(22,'Firma V');
+
+INSERT INTO public.shipments (shipment_id, client_id, employee_id, shipment_date, status)
+SELECT
+    gs,
+    gs,
+    1,
+    '2024-06-01',
+    'SENT'
+FROM generate_series(1, 5) gs;
+
+INSERT INTO public.shipments (shipment_id, client_id, employee_id, shipment_date, status)
+SELECT
+    gs + 100,
+    gs,
+    2,
+    '2024-06-05',
+    'SENT'
+FROM generate_series(1, 12) gs;
+
+INSERT INTO public.shipments (shipment_id, client_id, employee_id, shipment_date, status)
+SELECT
+    gs + 200,
+    gs,
+    3,
+    '2024-06-10',
+    'SENT'
+FROM generate_series(1, 22) gs;
+
+===============================FUNKCJA===============================
+
+CREATE OR REPLACE FUNCTION public.employee_productivity()
+RETURNS TABLE (
     employee_id BIGINT,
     clients_count INT,
     productivity_level TEXT
@@ -269,15 +626,17 @@ BEGIN
             WHEN COUNT(DISTINCT s.client_id) BETWEEN 10 AND 20 THEN 'MEDIUM'
             ELSE 'LOW'
         END AS productivity_level
-    FROM shipments s
+    FROM public.shipments s
+    WHERE s.employee_id IS NOT NULL
     GROUP BY s.employee_id;
 END;
 $$;
 
+===============================Wywolanie===============================
 
-Wywolanie:
 SELECT *
-FROM employee_productivity();
+FROM public.employee_productivity()
+ORDER BY employee_id;
 
 ====================================================================================================
 
@@ -290,10 +649,63 @@ Kroki:
 2.Zsumowanie wysyłanych ilości.
 3.Wybranie produktów przekraczających próg.
 
-CREATE OR REPLACE FUNCTION most_shipped_products(
+===============================Copy-Paste(DANE)===============================
+
+DELETE FROM public.receipt_details;
+DELETE FROM public.shipment_details;
+DELETE FROM public.shipments;
+DELETE FROM public.inventory;
+DELETE FROM public.products;
+DELETE FROM public.categories;
+DELETE FROM public.clients;
+DELETE FROM public.employees;
+
+INSERT INTO public.categories (category_id, name)
+VALUES (1, 'Kategoria testowa');
+
+INSERT INTO public.products (product_id, sku, name, category_id)
+VALUES
+(1, 'SKU-001', 'Produkt A', 1),
+(2, 'SKU-002', 'Produkt B', 1),
+(3, 'SKU-003', 'Produkt C', 1);
+
+
+INSERT INTO public.clients (client_id, company_name)
+VALUES
+(1, 'Firma Alfa'),
+(2, 'Firma Beta');
+
+INSERT INTO public.employees (employee_id, first_name, last_name, position)
+VALUES
+(1, 'Jan', 'Kowalski', 'Magazynier');
+
+INSERT INTO public.shipments (shipment_id, client_id, employee_id, shipment_date, status)
+VALUES
+(1, 1, 1, '2024-05-01', 'SENT'),
+(2, 1, 1, '2024-05-02', 'SENT'),
+(3, 2, 1, '2024-05-03', 'SENT');
+
+INSERT INTO public.shipment_details (shipment_id, product_id, quantity_to_ship)
+VALUES
+
+(1, 1, 400),
+(2, 1, 400),
+(3, 1, 400),
+
+(1, 2, 300),
+(2, 2, 300),
+(3, 2, 300),
+
+(1, 3, 500),
+(2, 3, 500),
+(3, 3, 500);
+
+===============================FUNKCJA===============================
+
+CREATE OR REPLACE FUNCTION public.most_shipped_products(
     p_min_quantity NUMERIC
 )
-RETURNS TABLE(
+RETURNS TABLE (
     product_id BIGINT,
     total_quantity NUMERIC
 )
@@ -304,16 +716,16 @@ BEGIN
     SELECT
         sd.product_id,
         SUM(sd.quantity_to_ship) AS total_quantity
-    FROM shipment_details sd
+    FROM public.shipment_details sd
     GROUP BY sd.product_id
     HAVING SUM(sd.quantity_to_ship) >= p_min_quantity;
 END;
 $$;
 
+===============================Wywolanie===============================
 
-Wywolanie:
 SELECT *
-FROM most_shipped_products(1000);
+FROM public.most_shipped_products(1000::NUMERIC);
 
 ====================================================================================================
 
@@ -326,7 +738,8 @@ Kroki:
 2.Sprawdzenie poprawności danych.
 3.Zgłoszenie błędu lub zatwierdzenie dostawy.
 
-CREATE OR REPLACE FUNCTION validate_receipt(
+===============================FUNCKJA===============================
+CREATE OR REPLACE FUNCTION public.validate_receipt(
     p_receipt_id BIGINT
 )
 RETURNS BOOLEAN
@@ -335,7 +748,7 @@ AS $$
 BEGIN
     IF EXISTS (
         SELECT 1
-        FROM receipt_details
+        FROM public.receipt_details
         WHERE receipt_id = p_receipt_id
           AND received_quantity > expected_quantity
     ) THEN
@@ -346,7 +759,7 @@ BEGIN
 END;
 $$;
 
-Wywolanie:
-SELECT validate_receipt(12);
+===============================Wywolanie:===============================
 
+SELECT public.validate_receipt(12);
 
