@@ -1,0 +1,106 @@
+\chapter{Specyfikacja tematu projektu}
+
+\section{Cel projektu}
+
+Celem projektu było zaprojektowanie oraz implementacja relacyjnej bazy danych
+dla systemu zarządzania magazynem.
+Projekt skupia się na stworzeniu spójnej, logicznej oraz znormalizowanej struktury
+danych, umożliwiającej efektywne przechowywanie i przetwarzanie informacji
+związanych z funkcjonowaniem magazynu.
+
+Głównym założeniem projektu było opracowanie bazy danych, która umożliwia
+zarządzanie stanami magazynowymi, produktami, kategoriami, klientami,
+pracownikami oraz procesami przyjęcia i wydania towarów.
+System wspiera realizację podstawowych operacji na danych (CRUD),
+a także zapytań problemowych pozwalających na analizę danych magazynowych.
+
+Celem jest praktyczne zastosowanie
+wiedzy z zakresu projektowania relacyjnych baz danych, definiowania relacji
+pomiędzy encjami, normalizacji danych oraz integracji bazy danych
+z warstwą aplikacyjną.
+
+
+\section{Zakres projektu}
+
+Zakres projektu obejmuje zaprojektowanie oraz implementację relacyjnej bazy danych
+systemu zarządzania magazynem.
+Baza danych umożliwia przechowywanie informacji niezbędnych do obsługi
+procesów magazynowych oraz zapewnia integralność i spójność danych.
+
+W ramach projektu zrealizowano:
+\begin{itemize}
+    \item definicję struktur tabel wraz z kluczami głównymi i obcymi,
+    \item zaprojektowanie relacji pomiędzy encjami systemu,
+    \item implementację operacji CRUD dla kluczowych tabel,
+    \item realizację zapytań problemowych o charakterze analitycznym,
+    \item opracowanie diagramu związków encji (ERD),
+    \item integrację bazy danych z aplikacją posiadającą interfejs graficzny.
+\end{itemize}
+
+Projekt obejmuje warstwę bazodanową oraz aplikacyjną.
+Interfejs użytkownika umożliwia wygodną obsługę systemu,
+natomiast logika biznesowa opiera się na zapytaniach SQL
+wykonywanych na relacyjnej bazie danych.
+
+
+\section{Technologie i narzędzia}
+
+Do realizacji projektu wykorzystano następujące technologie oraz narzędzia:
+\begin{itemize}
+    \item \textbf{PostgreSQL} – relacyjny system zarządzania bazą danych,
+    \item \textbf{pgAdmin4} – narzędzie administracyjne do zarządzania bazą danych,
+    \item \textbf{SQL} – język zapytań do definiowania struktury bazy danych
+    oraz operacji na danych,
+    \item \textbf{JetBrains IntelliJ IDEA} – środowisko programistyczne
+    wykorzystane do implementacji aplikacji, logiki systemu oraz interfejsu
+    graficznego użytkownika (GUI),
+    \item \textbf{Visual Studio Code} – środowisko używane do tworzenia
+    dokumentacji projektu w systemie \LaTeX.
+    \item \textbf{JDBC} – interfejs komunikacji aplikacji Java z bazą danych,
+\end{itemize}
+
+
+\section{Instrukcja uruchomienia projektu}
+
+Aby poprawnie uruchomić system na lokalnym środowisku, należy postępować
+zgodnie z poniższymi krokami:
+
+\begin{enumerate}
+    \item \textbf{Pobranie kodu źródłowego:}
+    \begin{itemize}
+        \item Pobierz projekt z repozytorium GitHub, klikając przycisk \textit{Code},
+        a następnie wybierając opcję \textit{Download ZIP}.
+        \item Rozpakuj pobrany folder ProjectBazyDanych-2rok-.
+        \item Otwórz rozpakowany folder w wybranym środowisku programistycznym
+        (zalecane: JetBrains IntelliJ IDEA).
+    \end{itemize}
+
+    \item \textbf{Przygotowanie relacyjnej bazy danych (PostgreSQL):}
+    \begin{itemize}
+        \item Uruchom narzędzie pgAdmin4 i utwórz nową, pustą bazę danych o nazwie SystemZarzadzaniaMagazynem.
+        \item Kliknij prawym przyciskiem myszy na utworzoną bazę danych i wybierz
+        opcję \textit{Restore}. Wybierz format Plain, i w pole Filename wklej plik "BD\_file.sql" i zatem nacisnij na przycisk \textit{Restore}.
+        \item Kliknij prawym przyciskiem myszy na utworzoną bazę danych i wybierz
+        opcję \textit{Refresh}.
+    \end{itemize}
+
+    \item \textbf{Konfiguracja połączenia z bazą danych:}
+    \begin{itemize}
+        \item Otwórz projekt aplikacji w środowisku JetBrains IntelliJ IDEA.
+        \item Skonfiguruj parametry połączenia z bazą danych w pliku "DataBaseConnection", takie jak:
+        nazwa bazy danych, użytkownik oraz hasło.
+        \item Upewnij się, że aplikacja posiada poprawny dostęp do serwera
+        PostgreSQL.
+    \end{itemize}
+
+    \item \textbf{Uruchomienie aplikacji:}
+    \begin{itemize}
+        \item Upewnij się, że serwer bazy danych PostgreSQL jest uruchomiony.
+        \item Uruchom aplikację z poziomu środowiska JetBrains IntelliJ IDEA. Uruchomić plik Main.
+        \item Po uruchomieniu aplikacji możliwa jest interakcja z systemem
+        poprzez interfejs graficzny użytkownika (GUI).
+    \end{itemize}
+\end{enumerate}
+
+Po wykonaniu powyższych kroków system zarządzania magazynem jest gotowy
+do pracy i umożliwia realizację operacji na danych magazynowych.

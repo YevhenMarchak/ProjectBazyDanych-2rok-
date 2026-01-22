@@ -1,0 +1,32 @@
+\chapter{Koncepcja dostępu zdalnego do bazy danych}
+
+\section{Założenia architektoniczne}
+
+System Zarządzania Magazynem został zrealizowany jako aplikacja
+desktopowa działająca w architekturze klient--serwer.
+Aplikacja kliencka została napisana w języku Java i komunikuje się
+bezpośrednio z serwerem bazy danych PostgreSQL.
+
+Dostęp do bazy danych realizowany jest z wykorzystaniem mechanizmu
+JDBC (Java Database Connectivity), który umożliwia wykonywanie
+zapytań SQL oraz wywoływanie procedur i funkcji składowanych.
+
+\section{Realizacja połączenia z bazą danych}
+
+Połączenie aplikacji z bazą danych realizowane jest poprzez klasę
+odpowiedzialną za konfigurację połączenia JDBC. Wykorzystywany jest
+adres serwera, numer portu, nazwa bazy danych oraz dane użytkownika.
+
+\section{Zakres dostępu do aplikacji}
+
+Aplikacja została zaprojektowana jako narzędzie administracyjne
+i przeznaczona jest wyłącznie do użytku przez administratora systemu.
+Nie przewidziano mechanizmu obsługi wielu ról użytkowników ani
+logowania końcowych użytkowników.
+
+Administrator posiada pełny dostęp do wszystkich funkcjonalności
+systemu, w tym do zarządzania danymi magazynowymi, obsługi procesów
+przyjęć i wysyłek oraz wykonywania zapytań analitycznych.
+Takie podejście upraszcza architekturę aplikacji oraz umożliwia
+bezpośrednią kontrolę nad danymi przechowywanymi w bazie.
+

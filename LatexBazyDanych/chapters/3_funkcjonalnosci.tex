@@ -1,0 +1,376 @@
+\chapter{Zapytania problemowe i ich realizacja}
+
+W niniejszym rozdziale przedstawiono zapytania problemowe,
+które odzwierciedlają rzeczywiste potrzeby biznesowe systemu
+zarządzania magazynem. Dla każdego problemu zaprezentowano
+opis zagadnienia, kolejne kroki rozwiązania oraz implementację
+w postaci funkcji lub procedury składowanej w języku PL/pgSQL.
+
+\section{Premia dla pracowników za obsłużone wysyłki (zrealizowane w interfejsie użytkownika)}
+\begin{itemize}
+    \item wyszukanie pracowników realizujących wysyłki w danym miesiącu,
+    \item zliczenie liczby wysyłek dla każdego pracownika,
+    \item wyznaczenie procentu premii na podstawie liczby wysyłek.
+\end{itemize}
+
+\begin{lstlisting}[language=SQL, caption={Funkcja obliczająca premię pracownika}]
+CREATE OR REPLACE FUNCTION public.calculate_employee_bonus(
+    p_month INT,
+    p_year INT
+)
+RETURNS TABLE (
+    employee_id BIGINT,
+    shipments_count INT,
+    bonus_percent INT
+)
+LANGUAGE plpgsql
+AS $$
+BEGIN
+    RETURN QUERY
+    SELECT
+        s.employee_id,
+        COUNT(*)::INT AS shipments_count,
+        CASE
+            WHEN COUNT(*) > 100 THEN 30
+            WHEN COUNT(*) BETWEEN 50 AND 100 THEN 15
+            ELSE 0
+        END AS bonus_percent
+    FROM public.shipments s
+    WHERE EXTRACT(MONTH FROM s.shipment_date) = p_month
+      AND EXTRACT(YEAR  FROM s.shipment_date) = p_year
+      AND s.employee_id IS NOT NULL
+    GROUP BY s.employee_id;
+END;
+$$;
+\end{lstlisting}
+
+\section{Automatyczne oznaczanie przeterminowanych wysyłek}
+\begin{itemize}
+    \item wyszukanie wysyłek starszych niż 7 dni,
+    \item sprawdzenie ich aktualnego statusu,
+    \item aktualizacja statusu na \texttt{OVERDUE}.
+\end{itemize}
+
+\begin{lstlisting}[language=SQL, caption={Procedura oznaczania przeterminowanych wysyłek}]
+CREATE OR REPLACE PROCEDURE public.mark_overdue_shipments()
+LANGUAGE plpgsql
+AS $$
+BEGIN
+    UPDATE public.shipments
+    SET status = 'OVERDUE'
+    WHERE shipment_date < CURRENT_DATE - INTERVAL '7 days'
+      AND status <> 'DELIVERED';
+END;
+$$;
+\end{lstlisting}
+
+\section{Wykrywanie braków magazynowych}
+\begin{itemize}
+    \item pobranie aktualnych stanów magazynowych,
+    \item porównanie ilości z progiem minimalnym,
+    \item zwrócenie produktów wymagających uzupełnienia.
+\end{itemize}
+
+\begin{lstlisting}[language=SQL, caption={Funkcja wykrywająca braki magazynowe}]
+CREATE OR REPLACE FUNCTION public.find_low_stock_products(
+    p_min_quantity NUMERIC
+)
+RETURNS TABLE (
+    product_id BIGINT,
+    location_id BIGINT,
+    quantity NUMERIC
+)
+LANGUAGE plpgsql
+AS $$
+BEGIN
+    RETURN QUERY
+    SELECT
+        i.product_id,
+        i.location_id,
+        i.quantity
+    FROM public.inventory i
+    WHERE i.quantity < p_min_quantity;
+END;
+$$;
+\end{lstlisting}
+
+\section{Obliczenie stopnia realizacji dostawy (zrealizowane w interfejsie użytkownika)}
+\begin{itemize}
+    \item pobranie ilości oczekiwanych i faktycznie odebranych produktów,
+    \item zsumowanie wartości dla całej dostawy,
+    \item obliczenie procentowego stopnia realizacji przyjęcia.
+\end{itemize}
+
+\begin{lstlisting}[language=SQL, caption={Funkcja obliczająca stopień realizacji dostawy}]
+CREATE OR REPLACE FUNCTION public.receipt_completion_percentage(
+    p_receipt_id BIGINT
+)
+RETURNS NUMERIC
+LANGUAGE plpgsql
+AS $$
+DECLARE
+    expected_sum NUMERIC := 0;
+    received_sum NUMERIC := 0;
+BEGIN
+    SELECT
+        COALESCE(SUM(expected_quantity), 0),
+        COALESCE(SUM(received_quantity), 0)
+    INTO expected_sum, received_sum
+    FROM public.receipt_details
+    WHERE receipt_id = p_receipt_id;
+
+    IF expected_sum = 0 THEN
+        RETURN 0;
+    END IF;
+
+    RETURN ROUND((received_sum / expected_sum) * 100, 2);
+END;
+$$;
+\end{lstlisting}
+
+\section{Najaktywniejsi klienci w danym okresie}
+\begin{itemize}
+    \item pobranie wysyłek z wybranego okresu,
+    \item zliczenie liczby wysyłek dla każdego klienta,
+    \item wybranie klientów przekraczających ustalony próg aktywności.
+\end{itemize}
+
+\begin{lstlisting}[language=SQL, caption={Funkcja identyfikująca najaktywniejszych klientów}]
+CREATE OR REPLACE FUNCTION public.get_top_clients(
+    p_from DATE,
+    p_to DATE,
+    p_min_shipments INT
+)
+RETURNS TABLE (
+    client_id BIGINT,
+    shipments_count INT
+)
+LANGUAGE plpgsql
+AS $$
+BEGIN
+    RETURN QUERY
+    SELECT
+        s.client_id,
+        COUNT(*)::INT AS shipments_count
+    FROM public.shipments s
+    WHERE s.shipment_date BETWEEN p_from AND p_to
+    GROUP BY s.client_id
+    HAVING COUNT(*) >= p_min_shipments;
+END;
+$$;
+\end{lstlisting}
+
+\section{Kontrola pojemności lokalizacji magazynowej}
+\begin{itemize}
+    \item zsumowanie ilości produktów przypisanych do lokalizacji,
+    \item pobranie maksymalnej pojemności lokalizacji,
+    \item porównanie wartości i zwrócenie wyniku kontroli.
+\end{itemize}
+
+\begin{lstlisting}[language=SQL, caption={Funkcja kontrolująca pojemność lokalizacji}]
+CREATE OR REPLACE FUNCTION public.check_location_capacity(
+    p_location_id BIGINT
+)
+RETURNS BOOLEAN
+LANGUAGE plpgsql
+AS $$
+DECLARE
+    total_quantity NUMERIC := 0;
+    v_max_capacity NUMERIC;
+BEGIN
+    SELECT COALESCE(SUM(i.quantity), 0)
+    INTO total_quantity
+    FROM public.inventory i
+    WHERE i.location_id = p_location_id;
+
+    SELECT l.max_capacity
+    INTO v_max_capacity
+    FROM public.locations l
+    WHERE l.location_id = p_location_id;
+
+    IF v_max_capacity IS NULL THEN
+        RETURN TRUE;
+    END IF;
+
+    RETURN total_quantity <= v_max_capacity;
+END;
+$$;
+\end{lstlisting}
+
+\section{Aktualizacja stanu magazynu po przyjęciu dostawy}
+\begin{itemize}
+    \item pobranie danych o faktycznie odebranych ilościach produktów,
+    \item dopasowanie produktów do odpowiednich rekordów magazynowych,
+    \item aktualizacja ilości oraz daty ostatniej modyfikacji.
+\end{itemize}
+
+\begin{lstlisting}[language=SQL, caption={Procedura aktualizująca stany magazynowe po przyjęciu}]
+CREATE OR REPLACE PROCEDURE public.update_inventory_after_receipt(
+    p_receipt_id BIGINT
+)
+LANGUAGE plpgsql
+AS $$
+BEGIN
+    UPDATE public.inventory i
+    SET quantity = i.quantity + rd.received_quantity,
+        last_updated = NOW()
+    FROM public.receipt_details rd
+    WHERE rd.receipt_id = p_receipt_id
+      AND rd.product_id = i.product_id;
+END;
+$$;
+\end{lstlisting}
+
+\section{Ocena produktywności pracowników (zrealizowane w interfejsie użytkownika)}
+\begin{itemize}
+    \item pobranie danych o wysyłkach realizowanych przez pracowników,
+    \item zliczenie liczby unikalnych klientów,
+    \item określenie poziomu produktywności pracownika.
+\end{itemize}
+
+\begin{lstlisting}[language=SQL, caption={Funkcja oceniająca produktywność pracowników}]
+CREATE OR REPLACE FUNCTION public.employee_productivity()
+RETURNS TABLE (
+    employee_id BIGINT,
+    clients_count INT,
+    productivity_level TEXT
+)
+LANGUAGE plpgsql
+AS $$
+BEGIN
+    RETURN QUERY
+    SELECT
+        s.employee_id,
+        COUNT(DISTINCT s.client_id)::INT AS clients_count,
+        CASE
+            WHEN COUNT(DISTINCT s.client_id) > 20 THEN 'HIGH'
+            WHEN COUNT(DISTINCT s.client_id) BETWEEN 10 AND 20 THEN 'MEDIUM'
+            ELSE 'LOW'
+        END AS productivity_level
+    FROM public.shipments s
+    WHERE s.employee_id IS NOT NULL
+    GROUP BY s.employee_id;
+END;
+$$;
+\end{lstlisting}
+
+\section{Najczęściej wysyłane produkty (zrealizowane w interfejsie użytkownika)}
+\begin{itemize}
+    \item pobranie danych dotyczących wysyłanych produktów,
+    \item zsumowanie ilości wysyłek dla poszczególnych produktów,
+    \item wybranie produktów przekraczających ustalony próg.
+\end{itemize}
+
+\begin{lstlisting}[language=SQL, caption={Funkcja identyfikująca najczęściej wysyłane produkty}]
+CREATE OR REPLACE FUNCTION public.most_shipped_products(
+    p_min_quantity NUMERIC
+)
+RETURNS TABLE (
+    product_id BIGINT,
+    total_quantity NUMERIC
+)
+LANGUAGE plpgsql
+AS $$
+BEGIN
+    RETURN QUERY
+    SELECT
+        sd.product_id,
+        SUM(sd.quantity_to_ship) AS total_quantity
+    FROM public.shipment_details sd
+    GROUP BY sd.product_id
+    HAVING SUM(sd.quantity_to_ship) >= p_min_quantity;
+END;
+$$;
+\end{lstlisting}
+
+\section{Walidacja poprawności dostawy}
+\begin{itemize}
+    \item pobranie danych dotyczących ilości oczekiwanych i odebranych,
+    \item sprawdzenie poprawności wartości,
+    \item zatwierdzenie lub odrzucenie dostawy.
+\end{itemize}
+
+\begin{lstlisting}[language=SQL, caption={Funkcja walidująca poprawność dostawy}]
+CREATE OR REPLACE FUNCTION public.validate_receipt(
+    p_receipt_id BIGINT
+)
+RETURNS BOOLEAN
+LANGUAGE plpgsql
+AS $$
+BEGIN
+    IF EXISTS (
+        SELECT 1
+        FROM public.receipt_details
+        WHERE receipt_id = p_receipt_id
+          AND received_quantity > expected_quantity
+    ) THEN
+        RETURN FALSE;
+    END IF;
+
+    RETURN TRUE;
+END;
+$$;
+\end{lstlisting}
+
+\section{Wymagania CRUD systemu}
+
+System zarządzania magazynem musi zapewniać pełną obsługę operacji
+typu CRUD (Create, Read, Update, Delete) dla wszystkich kluczowych
+encji występujących w bazie danych. Operacje te są niezbędne do
+prawidłowego funkcjonowania systemu oraz realizacji zapytań
+problemowych przedstawionych w dalszej części rozdziału.
+
+\subsection*{Create (tworzenie danych)}
+Operacje tworzenia danych umożliwiają dodawanie nowych rekordów
+do bazy danych, takich jak:
+\begin{itemize}
+    \item nowi klienci i dostawcy,
+    \item produkty oraz ich kategorie,
+    \item lokalizacje magazynowe,
+    \item przyjęcia towarów (receipts) oraz wysyłki (shipments),
+    \item szczegóły przyjęć i wysyłek.
+\end{itemize}
+Operacje \texttt{CREATE} realizowane są przy użyciu procedur
+składowanych, które dodatkowo wykonują walidację danych wejściowych.
+
+\subsection*{Read (odczyt danych)}
+Operacje odczytu danych umożliwiają pobieranie informacji
+niezbędnych do analizy stanu magazynu i podejmowania decyzji
+biznesowych. Obejmują one m.in.:
+\begin{itemize}
+    \item przegląd aktualnych stanów magazynowych,
+    \item listę klientów, dostawców i pracowników,
+    \item historię wysyłek i przyjęć towarów,
+    \item dane wykorzystywane w zapytaniach analitycznych.
+\end{itemize}
+Operacje \texttt{READ} realizowane są za pomocą funkcji zwracających
+pojedyncze rekordy lub zbiory danych.
+
+\subsection*{Update (aktualizacja danych)}
+Operacje aktualizacji danych umożliwiają modyfikację istniejących
+rekordów w bazie danych, w szczególności:
+\begin{itemize}
+    \item zmianę statusów wysyłek i dostaw,
+    \item aktualizację stanów magazynowych,
+    \item korektę danych klientów, produktów i lokalizacji,
+    \item rejestrację faktycznie odebranych ilości towarów.
+\end{itemize}
+Operacje \texttt{UPDATE} są realizowane przez procedury składowane,
+co zapewnia spójność danych i kontrolę poprawności modyfikacji.
+
+\subsection*{Delete (usuwanie danych)}
+Operacje usuwania danych pozwalają na eliminację nieaktualnych
+lub błędnie wprowadzonych rekordów, takich jak:
+\begin{itemize}
+    \item nieużywane produkty lub kategorie,
+    \item błędnie dodane rekordy magazynowe,
+    \item anulowane wysyłki lub przyjęcia.
+\end{itemize}
+Operacje \texttt{DELETE} są zabezpieczone mechanizmami integralności
+referencyjnej, co zapobiega usuwaniu danych powiązanych z innymi
+encjami systemu.
+
+\medskip
+Spełnienie powyższych wymagań CRUD stanowi podstawę do realizacji
+zaawansowanych funkcjonalności systemu, w tym zapytań problemowych
+opisanych w kolejnych podrozdziałach.

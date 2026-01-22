@@ -1,0 +1,154 @@
+\chapter{Przedstawienie powstałej bazy danych i wdrożonych mechanizmów}
+
+\section{Realizacja mechanizmu CRUD}
+
+W systemie zarządzania magazynem zaimplementowano mechanizm CRUD
+(\textit{Create, Read, Update, Delete}), który umożliwia wykonywanie
+podstawowych operacji na danych przechowywanych w relacyjnej bazie danych
+PostgreSQL. Mechanizm ten został zrealizowany przy użyciu procedur oraz
+funkcji składowanych napisanych w języku \textit{PL/pgSQL}.
+
+W celu czytelnego zaprezentowania działania mechanizmu CRUD,
+jego implementację przedstawiono na przykładzie tabeli
+\textbf{clients}, przechowującej dane klientów obsługiwanych przez system.
+Dla tej tabeli przygotowano komplet procedur i funkcji umożliwiających
+dodawanie, odczyt, aktualizację oraz usuwanie danych.
+
+\subsection{Operacja Create}
+
+Operacja \textit{Create} odpowiada za dodawanie nowych rekordów do tabeli
+\texttt{clients}. Zrealizowano ją w postaci procedury składowanej,
+która przyjmuje dane klienta jako parametry wejściowe.
+Przed zapisaniem danych wykonywana jest walidacja poprawności
+najważniejszych pól, takich jak nazwa firmy oraz adres e-mail.
+Dzięki temu system zapobiega zapisywaniu niepoprawnych danych w bazie.
+
+\begin{lstlisting}[language=SQL, caption={Procedura dodawania klienta}]
+CREATE OR REPLACE PROCEDURE public.clients_create(
+    IN p_company_name text,
+    IN p_delivery_address text,
+    IN p_phone text,
+    IN p_email text,
+    IN p_tax_id text
+)
+LANGUAGE plpgsql
+AS $$
+BEGIN
+    IF p_company_name IS NULL OR trim(p_company_name) = '' THEN
+        RAISE EXCEPTION 'Company name cannot be empty';
+    END IF;
+
+    IF p_email IS NOT NULL AND position('@' IN p_email) = 0 THEN
+        RAISE EXCEPTION 'Invalid email format: %', p_email;
+    END IF;
+
+    INSERT INTO clients(
+        company_name, delivery_address, phone, email, tax_id
+    )
+    VALUES (
+        p_company_name, p_delivery_address, p_phone, p_email, p_tax_id
+    );
+END;
+$$;
+\end{lstlisting}
+
+\subsection{Operacja Read}
+
+Operacja \textit{Read} umożliwia odczyt danych klienta z bazy danych.
+Została ona zaimplementowana w postaci funkcji składowanej,
+która na podstawie identyfikatora klienta zwraca kompletny rekord
+zawierający jego dane. W przypadku próby odczytu nieistniejącego rekordu
+funkcja zgłasza wyjątek informujący o braku danych.
+
+\begin{lstlisting}[language=SQL, caption={Funkcja odczytu danych klienta}]
+CREATE OR REPLACE FUNCTION public.clients_read_one(
+    p_client_id bigint
+)
+RETURNS public.clients
+LANGUAGE plpgsql
+AS $$
+DECLARE
+    v_row clients;
+BEGIN
+    SELECT *
+    INTO v_row
+    FROM clients
+    WHERE client_id = p_client_id;
+
+    IF NOT FOUND THEN
+        RAISE EXCEPTION 'Client with id % not found', p_client_id;
+    END IF;
+
+    RETURN v_row;
+END;
+$$;
+\end{lstlisting}
+
+\subsection{Operacja Update}
+
+Operacja \textit{Update} odpowiada za aktualizację istniejących danych
+klienta. Została zrealizowana w formie procedury składowanej,
+która umożliwia modyfikację wybranych pól rekordu.
+Procedura sprawdza istnienie klienta w bazie danych oraz wykonuje
+podstawową walidację danych wejściowych przed dokonaniem aktualizacji.
+
+\begin{lstlisting}[language=SQL, caption={Procedura aktualizacji danych klienta}]
+CREATE OR REPLACE PROCEDURE public.clients_update(
+    IN p_client_id bigint,
+    IN p_company_name text,
+    IN p_delivery_address text,
+    IN p_phone text,
+    IN p_email text,
+    IN p_tax_id text
+)
+LANGUAGE plpgsql
+AS $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM clients WHERE client_id = p_client_id
+    ) THEN
+        RAISE EXCEPTION 'Client with id % does not exist', p_client_id;
+    END IF;
+
+    UPDATE clients
+    SET company_name     = COALESCE(p_company_name, company_name),
+        delivery_address = COALESCE(p_delivery_address, delivery_address),
+        phone            = COALESCE(p_phone, phone),
+        email            = COALESCE(p_email, email),
+        tax_id           = COALESCE(p_tax_id, tax_id)
+    WHERE client_id = p_client_id;
+END;
+$$;
+\end{lstlisting}
+
+\subsection{Operacja Delete}
+
+Operacja \textit{Delete} służy do usuwania danych klienta z systemu.
+Została ona zaimplementowana w postaci procedury składowanej,
+która przed usunięciem rekordu sprawdza jego istnienie.
+Dodatkowo obsługiwana jest sytuacja naruszenia integralności referencyjnej,
+np. gdy klient jest powiązany z wysyłkami, co uniemożliwia jego usunięcie.
+
+\begin{lstlisting}[language=SQL, caption={Procedura usuwania klienta}]
+CREATE OR REPLACE PROCEDURE public.clients_delete(
+    IN p_client_id bigint
+)
+LANGUAGE plpgsql
+AS $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM clients WHERE client_id = p_client_id
+    ) THEN
+        RAISE EXCEPTION 'Client with id % does not exist', p_client_id;
+    END IF;
+
+    DELETE FROM clients WHERE client_id = p_client_id;
+
+EXCEPTION
+    WHEN foreign_key_violation THEN
+        RAISE EXCEPTION
+            'Cannot delete client %, client is used in shipments',
+            p_client_id;
+END;
+$$;
+\end{lstlisting}

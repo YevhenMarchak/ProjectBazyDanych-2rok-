@@ -1,0 +1,417 @@
+\chapter{Aspekt projektowy baz danych}
+
+
+\section{Zdefiniowane struktury tabel}
+
+W niniejszym podrozdziale przedstawiono szczegółowy opis tabel
+wchodzących w skład relacyjnej bazy danych systemu zarządzania magazynem.
+Każda tabela została zaprojektowana w sposób zapewniający spójność danych
+oraz poprawne odwzorowanie procesów magazynowych.
+
+\subsection{Tabela \texttt{categories}}
+
+Tabela \texttt{categories} przechowuje informacje o kategoriach produktów
+dostępnych w magazynie.
+\begin{itemize}
+    \item \texttt{category\_id} (\texttt{BIGSERIAL}, PK) — unikalny identyfikator kategorii,
+    \item \texttt{name} (\texttt{text}, NOT NULL) — nazwa kategorii,
+    \item \texttt{description} (\texttt{text}) — opis kategorii.
+\end{itemize}
+
+\subsection{Tabela \texttt{suppliers}}
+
+Tabela \texttt{suppliers} zawiera dane dotyczące dostawców towarów.
+\begin{itemize}
+    \item \texttt{supplier\_id} (\texttt{BIGSERIAL}, PK) — identyfikator dostawcy,
+    \item \texttt{company\_name} (\texttt{text}, NOT NULL) — nazwa firmy dostawcy,
+    \item \texttt{address} (\texttt{text}) — adres dostawcy,
+    \item \texttt{phone} (\texttt{text}) — numer telefonu,
+    \item \texttt{email} (\texttt{text}) — adres e-mail,
+    \item \texttt{tax\_id} (\texttt{text}) — numer podatkowy.
+\end{itemize}
+
+\subsection{Tabela \texttt{clients}}
+
+Tabela \texttt{clients} przechowuje dane klientów systemu magazynowego.
+\begin{itemize}
+    \item \texttt{client\_id} (\texttt{BIGSERIAL}, PK) — identyfikator klienta,
+    \item \texttt{company\_name} (\texttt{text}, NOT NULL) — nazwa firmy klienta,
+    \item \texttt{delivery\_address} (\texttt{text}) — adres dostawy,
+    \item \texttt{phone} (\texttt{text}) — numer telefonu,
+    \item \texttt{email} (\texttt{text}) — adres e-mail,
+    \item \texttt{tax\_id} (\texttt{text}) — numer podatkowy.
+\end{itemize}
+
+\subsection{Tabela \texttt{employees}}
+
+Tabela \texttt{employees} zawiera informacje o pracownikach magazynu.
+\begin{itemize}
+    \item \texttt{employee\_id} (\texttt{BIGSERIAL}, PK) — identyfikator pracownika,
+    \item \texttt{first\_name} (\texttt{text}, NOT NULL) — imię,
+    \item \texttt{last\_name} (\texttt{text}, NOT NULL) — nazwisko,
+    \item \texttt{position} (\texttt{varchar(100)}, NOT NULL) — stanowisko,
+    \item \texttt{hire\_date} (\texttt{date}) — data zatrudnienia,
+    \item \texttt{phone} (\texttt{text}) — numer telefonu,
+    \item \texttt{email} (\texttt{text}) — adres e-mail.
+\end{itemize}
+
+\subsection{Tabela \texttt{locations}}
+
+Tabela \texttt{locations} definiuje lokalizacje magazynowe.
+\begin{itemize}
+    \item \texttt{location\_id} (\texttt{BIGSERIAL}, PK) — identyfikator lokalizacji,
+    \item \texttt{location\_code} (\texttt{text}, NOT NULL) — kod lokalizacji,
+    \item \texttt{location\_type} (\texttt{varchar(50)}, NOT NULL) — typ lokalizacji,
+    \item \texttt{max\_capacity} (\texttt{numeric}) — maksymalna pojemność lokalizacji.
+\end{itemize}
+
+\subsection{Tabela \texttt{shipments}}
+
+Tabela \texttt{shipments} rejestruje wydania towarów z magazynu do klientów.
+Zawiera informacje dotyczące realizowanych wysyłek oraz osób odpowiedzialnych
+za ich obsługę.
+
+\begin{itemize}
+    \item \texttt{shipment\_id} (\texttt{BIGSERIAL}, PK) — identyfikator wydania,
+    \item \texttt{client\_id} (\texttt{bigint}, NOT NULL, FK $\rightarrow$ \texttt{clients.client\_id}) — klient,
+    \item \texttt{employee\_id} (\texttt{bigint}, FK $\rightarrow$ \texttt{employees.employee\_id}) — pracownik realizujący wydanie,
+    \item \texttt{shipment\_date} (\texttt{date}, NOT NULL) — data wydania,
+    \item \texttt{status} (\texttt{varchar(50)}, NOT NULL) — status wydania
+    (np. „oczekujące”, „zrealizowane”).
+\end{itemize}
+
+\subsection{Tabela \texttt{shipment\_details}}
+
+Tabela \texttt{shipment\_details} przechowuje szczegółowe informacje dotyczące
+produktów wydawanych w ramach konkretnego wydania magazynowego.
+Stanowi tabelę pośrednią realizującą relację wiele do wielu pomiędzy
+wydaniami a produktami.
+
+\begin{itemize}
+    \item \texttt{shipment\_id} (\texttt{bigint}, NOT NULL, FK $\rightarrow$ \texttt{shipments.shipment\_id}),
+    \item \texttt{product\_id} (\texttt{bigint}, NOT NULL, FK $\rightarrow$ \texttt{products.product\_id}),
+    \item \texttt{quantity} (\texttt{numeric}, NOT NULL) — ilość wydanego produktu.
+\end{itemize}
+
+\subsection{Tabela \texttt{products}}
+
+Tabela \texttt{products} przechowuje informacje o produktach.
+\begin{itemize}
+    \item \texttt{product\_id} (\texttt{BIGSERIAL}, PK) — identyfikator produktu,
+    \item \texttt{sku} (\texttt{text}, NOT NULL) — kod SKU produktu,
+    \item \texttt{name} (\texttt{text}, NOT NULL) — nazwa produktu,
+    \item \texttt{description} (\texttt{text}) — opis produktu,
+    \item \texttt{category\_id} (\texttt{bigint}, FK $\rightarrow$ \texttt{categories.category\_id}) — kategoria produktu,
+    \item \texttt{supplier\_id} (\texttt{bigint}, FK $\rightarrow$ \texttt{suppliers.supplier\_id}) — dostawca produktu,
+    \item \texttt{weight} (\texttt{numeric}) — waga produktu,
+    \item \texttt{dimensions} (\texttt{text}) — wymiary produktu.
+\end{itemize}
+
+\subsection{Tabela \texttt{inventory}}
+
+Tabela \texttt{inventory} przechowuje informacje o stanach magazynowych.
+\begin{itemize}
+    \item \texttt{inventory\_id} (\texttt{BIGSERIAL}, PK) — identyfikator rekordu magazynowego,
+    \item \texttt{product\_id} (\texttt{bigint}, FK $\rightarrow$ \texttt{products.product\_id}) — produkt,
+    \item \texttt{location\_id} (\texttt{bigint}, FK $\rightarrow$ \texttt{locations.location\_id}) — lokalizacja magazynowa,
+    \item \texttt{quantity} (\texttt{numeric}, NOT NULL) — ilość produktu,
+    \item \texttt{last\_updated} (\texttt{timestamptz}) — data ostatniej aktualizacji.
+\end{itemize}
+
+\subsection{Tabela \texttt{receipts}}
+
+Tabela \texttt{receipts} rejestruje przyjęcia towarów do magazynu.
+\begin{itemize}
+    \item \texttt{receipt\_id} (\texttt{BIGSERIAL}, PK) — identyfikator przyjęcia,
+    \item \texttt{supplier\_id} (\texttt{bigint}, FK $\rightarrow$ \texttt{suppliers.supplier\_id}) — dostawca,
+    \item \texttt{employee\_id} (\texttt{bigint}, FK $\rightarrow$ \texttt{employees.employee\_id}) — pracownik przyjmujący,
+    \item \texttt{receipt\_date} (\texttt{date}, NOT NULL) — data przyjęcia,
+    \item \texttt{external\_invoice\_no} (\texttt{text}) — numer faktury zewnętrznej,
+    \item \texttt{status} (\texttt{varchar(50)}, NOT NULL) — status przyjęcia.
+\end{itemize}
+
+\subsection{Tabela \texttt{receipt\_details}}
+
+Tabela \texttt{receipt\_details} zawiera szczegóły przyjęć magazynowych.
+\begin{itemize}
+    \item \texttt{receipt\_id} (\texttt{bigint}, FK $\rightarrow$ \texttt{receipts.receipt\_id}),
+    \item \texttt{product\_id} (\texttt{bigint}, FK $\rightarrow$ \texttt{products.product\_id}),
+    \item \texttt{expected\_quantity} (\texttt{numeric}, NOT NULL) — ilość oczekiwana,
+    \item \texttt{received\_quantity} (\texttt{numeric}) — ilość faktycznie otrzymana.
+\end{itemize}
+
+\section{Diagram związków encji}
+
+Struktura relacyjnej bazy danych systemu zarządzania magazynem
+została przedstawiona w postaci diagramu związków encji (ERD).
+Diagram obrazuje encje występujące w systemie oraz relacje
+pomiędzy nimi, w tym klucze główne oraz obce.
+
+Diagram ERD stanowi graficzne odwzorowanie struktury bazy danych
+i ułatwia analizę zależności pomiędzy poszczególnymi tabelami.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.95\textwidth]{figures/ERD.jpg}
+    \caption{Diagram związków encji (ERD) systemu zarządzania magazynem}
+    \label{fig:erd}
+\end{figure}
+
+\section{Powiązania pomiędzy tabelami}
+
+Relacje pomiędzy tabelami w systemie zarządzania magazynem zostały
+zaprojektowane w sposób odzwierciedlający rzeczywiste zależności
+występujące w procesach magazynowych.
+Zastosowanie kluczy obcych zapewnia integralność referencyjną danych
+oraz eliminuje możliwość występowania niespójnych rekordów.
+
+Poniżej przedstawiono najważniejsze relacje pomiędzy encjami systemu:
+
+\begin{itemize}
+    \item Relacja typu jeden do wielu (1:N) pomiędzy tabelą
+    \texttt{categories} a tabelą \texttt{products}.
+    Jedna kategoria może być przypisana do wielu produktów,
+    natomiast każdy produkt należy do jednej kategorii.
+
+    \item Relacja typu jeden do wielu (1:N) pomiędzy tabelą
+    \texttt{suppliers} a tabelą \texttt{products}.
+    Jeden dostawca może dostarczać wiele produktów,
+    natomiast każdy produkt posiada jednego dostawcę.
+
+    \item Relacja typu jeden do wielu (1:N) pomiędzy tabelą
+    \texttt{locations} a tabelą \texttt{inventory}.
+    Jedna lokalizacja magazynowa może zawierać wiele rekordów stanów magazynowych.
+
+    \item Relacja typu jeden do wielu (1:N) pomiędzy tabelą
+    \texttt{products} a tabelą \texttt{inventory}.
+    Każdy produkt może występować w wielu lokalizacjach magazynowych.
+
+    \item Relacja typu jeden do wielu (1:N) pomiędzy tabelą
+    \texttt{suppliers} a tabelą \texttt{receipts}.
+    Jeden dostawca może realizować wiele przyjęć magazynowych.
+
+    \item Relacja typu jeden do wielu (1:N) pomiędzy tabelą
+    \texttt{employees} a tabelą \texttt{receipts}.
+    Jeden pracownik może obsługiwać wiele przyjęć towarów.
+
+    \item Relacja typu wiele do wielu (N:M) pomiędzy tabelą
+    \texttt{receipts} a tabelą \texttt{products},
+    zrealizowana za pomocą tabeli pośredniej \texttt{receipt\_details}.
+    Tabela ta przechowuje informacje o ilościach oczekiwanych oraz faktycznie
+    otrzymanych produktów.
+
+    \item Relacja typu jeden do wielu (1:N) pomiędzy tabelą
+    \texttt{clients} a tabelą \texttt{shipments}.
+    Jeden klient może posiadać wiele wydań magazynowych.
+
+    \item Relacja typu jeden do wielu (1:N) pomiędzy tabelą
+    \texttt{employees} a tabelą \texttt{shipments}.
+    Jeden pracownik może realizować wiele wydań towarów.
+
+    \item Relacja typu wiele do wielu (N:M) pomiędzy tabelą
+    \texttt{shipments} a tabelą \texttt{products},
+    zrealizowana za pomocą tabeli pośredniej \texttt{shipment\_details}.
+    Tabela ta przechowuje informacje o ilości wydanych produktów.
+\end{itemize}
+
+Zaprojektowane relacje umożliwiają poprawne odwzorowanie procesów
+przyjęcia oraz wydania towarów, a także zapewniają spójność
+i integralność danych w całym systemie.
+
+\section{Kod realizujący bazę danych}
+
+W niniejszym podrozdziale przedstawiono kompletną definicję struktur
+tabel relacyjnej bazy danych systemu zarządzania magazynem.
+Zaprezentowane listingi zawierają instrukcje \texttt{CREATE TABLE}
+odpowiedzialne za utworzenie wszystkich encji systemu wraz
+z kluczami głównymi, kluczami obcymi oraz ograniczeniami integralności.
+
+\begin{lstlisting}[language=SQL, caption={Definicja tabeli categories}]
+CREATE TABLE categories (
+    category_id BIGSERIAL PRIMARY KEY,
+    name TEXT NOT NULL UNIQUE,
+    description TEXT
+);
+\end{lstlisting}
+
+\begin{lstlisting}[language=SQL, caption={Definicja tabeli suppliers}]
+CREATE TABLE suppliers (
+    supplier_id BIGSERIAL PRIMARY KEY,
+    company_name TEXT NOT NULL,
+    address TEXT,
+    phone TEXT,
+    email TEXT,
+    tax_id TEXT
+);
+\end{lstlisting}
+
+\begin{lstlisting}[language=SQL, caption={Definicja tabeli clients}]
+CREATE TABLE clients (
+    client_id BIGSERIAL PRIMARY KEY,
+    company_name TEXT NOT NULL,
+    delivery_address TEXT,
+    phone TEXT,
+    email TEXT,
+    tax_id TEXT
+);
+\end{lstlisting}
+
+\begin{lstlisting}[language=SQL, caption={Definicja tabeli employees}]
+CREATE TABLE employees (
+    employee_id BIGSERIAL PRIMARY KEY,
+    first_name TEXT NOT NULL,
+    last_name TEXT NOT NULL,
+    position VARCHAR(100) NOT NULL,
+    hire_date DATE,
+    phone TEXT,
+    email TEXT
+);
+\end{lstlisting}
+
+\begin{lstlisting}[language=SQL, caption={Definicja tabeli locations}]
+CREATE TABLE locations (
+    location_id BIGSERIAL PRIMARY KEY,
+    location_code TEXT NOT NULL UNIQUE,
+    location_type VARCHAR(50) NOT NULL,
+    max_capacity NUMERIC CHECK (max_capacity >= 0)
+);
+\end{lstlisting}
+
+\begin{lstlisting}[language=SQL, caption={Definicja tabeli products}]
+CREATE TABLE products (
+    product_id BIGSERIAL PRIMARY KEY,
+    sku TEXT NOT NULL UNIQUE,
+    name TEXT NOT NULL,
+    description TEXT,
+    category_id BIGINT NOT NULL,
+    supplier_id BIGINT,
+    weight NUMERIC CHECK (weight >= 0),
+    dimensions TEXT,
+    FOREIGN KEY (category_id) REFERENCES categories(category_id),
+    FOREIGN KEY (supplier_id) REFERENCES suppliers(supplier_id)
+);
+\end{lstlisting}
+
+\begin{lstlisting}[language=SQL, caption={Definicja tabeli inventory}]
+CREATE TABLE inventory (
+    inventory_id BIGSERIAL PRIMARY KEY,
+    product_id BIGINT NOT NULL,
+    location_id BIGINT NOT NULL,
+    quantity NUMERIC NOT NULL CHECK (quantity >= 0),
+    last_updated TIMESTAMPTZ DEFAULT now(),
+    UNIQUE (product_id, location_id),
+    FOREIGN KEY (product_id) REFERENCES products(product_id),
+    FOREIGN KEY (location_id) REFERENCES locations(location_id)
+);
+\end{lstlisting}
+
+\begin{lstlisting}[language=SQL, caption={Definicja tabeli receipts}]
+CREATE TABLE receipts (
+    receipt_id BIGSERIAL PRIMARY KEY,
+    supplier_id BIGINT NOT NULL,
+    employee_id BIGINT,
+    receipt_date DATE DEFAULT CURRENT_DATE,
+    external_invoice_no TEXT,
+    status VARCHAR(50) NOT NULL,
+    FOREIGN KEY (supplier_id) REFERENCES suppliers(supplier_id),
+    FOREIGN KEY (employee_id) REFERENCES employees(employee_id)
+);
+\end{lstlisting}
+
+\begin{lstlisting}[language=SQL, caption={Definicja tabeli receipt\_details}]
+CREATE TABLE receipt_details (
+    receipt_id BIGINT NOT NULL,
+    product_id BIGINT NOT NULL,
+    expected_quantity NUMERIC NOT NULL CHECK (expected_quantity >= 0),
+    received_quantity NUMERIC NOT NULL CHECK (received_quantity >= 0),
+    PRIMARY KEY (receipt_id, product_id),
+    FOREIGN KEY (receipt_id) REFERENCES receipts(receipt_id),
+    FOREIGN KEY (product_id) REFERENCES products(product_id)
+);
+\end{lstlisting}
+
+\begin{lstlisting}[language=SQL, caption={Definicja tabeli shipments}]
+CREATE TABLE shipments (
+    shipment_id BIGSERIAL PRIMARY KEY,
+    client_id BIGINT NOT NULL,
+    employee_id BIGINT,
+    shipment_date DATE DEFAULT CURRENT_DATE,
+    client_order_no TEXT,
+    status VARCHAR(50) NOT NULL,
+    FOREIGN KEY (client_id) REFERENCES clients(client_id),
+    FOREIGN KEY (employee_id) REFERENCES employees(employee_id)
+);
+\end{lstlisting}
+
+\begin{lstlisting}[language=SQL, caption={Definicja tabeli shipment\_details}]
+CREATE TABLE shipment_details (
+    shipment_id BIGINT NOT NULL,
+    product_id BIGINT NOT NULL,
+    quantity_to_ship NUMERIC NOT NULL CHECK (quantity_to_ship >= 0),
+    PRIMARY KEY (shipment_id, product_id),
+    FOREIGN KEY (shipment_id) REFERENCES shipments(shipment_id),
+    FOREIGN KEY (product_id) REFERENCES products(product_id)
+);
+\end{lstlisting}
+
+\section{Normalizacja bazy danych}
+
+Proces normalizacji bazy danych został przeprowadzony w celu eliminacji redundancji danych,
+zapewnienia spójności informacji oraz poprawy integralności logicznej systemu.
+Projektowana baza danych systemu zarządzania magazynem spełnia założenia trzech
+pierwszych postaci normalnych: 1NF, 2NF oraz 3NF.
+
+\subsection{Pierwsza postać normalna (1NF)}
+
+Pierwsza postać normalna wymaga, aby:
+\begin{itemize}
+    \item wszystkie atrybuty zawierały wartości atomowe,
+    \item w tabelach nie występowały powtarzające się grupy danych,
+    \item każdy rekord był jednoznacznie identyfikowany przez klucz główny.
+\end{itemize}
+
+W zaprojektowanej bazie danych wszystkie tabele posiadają klucze główne
+(np. \texttt{category\_id}, \texttt{product\_id}, \texttt{shipment\_id}),
+a każdy atrybut przechowuje pojedynczą, niepodzielną wartość.
+Nie występują pola wielowartościowe ani listy danych w jednym atrybucie.
+
+\subsection{Druga postać normalna (2NF)}
+
+Druga postać normalna wymaga spełnienia warunków 1NF oraz braku zależności
+częściowych atrybutów niekluczowych od części klucza głównego.
+
+W bazie danych zależności częściowe zostały wyeliminowane poprzez:
+\begin{itemize}
+    \item rozdzielenie danych opisowych do osobnych tabel (np. \texttt{categories}, \texttt{suppliers}),
+    \item zastosowanie tabel pośrednich z kluczami złożonymi, takich jak
+    \texttt{receipt\_details} oraz \texttt{shipment\_details}.
+\end{itemize}
+
+W tabelach posiadających klucz złożony wszystkie atrybuty niekluczowe
+zależą od całego klucza głównego, a nie od jego fragmentu.
+
+\subsection{Trzecia postać normalna (3NF)}
+
+Trzecia postać normalna wymaga, aby w tabelach nie występowały zależności
+przechodnie pomiędzy atrybutami niekluczowymi.
+
+W zaprojektowanej bazie danych:
+\begin{itemize}
+    \item dane klientów, pracowników, dostawców i produktów zostały umieszczone
+    w oddzielnych tabelach,
+    \item informacje zależne od innych encji są przechowywane wyłącznie poprzez
+    klucze obce,
+    \item nie występują atrybuty, które mogłyby być wyznaczane na podstawie innych
+    atrybutów niekluczowych w tej samej tabeli.
+\end{itemize}
+
+Dzięki temu baza danych spełnia wymagania trzeciej postaci normalnej,
+zapewniając wysoką spójność danych oraz łatwość dalszej rozbudowy systemu.
+
+\subsection{Podsumowanie}
+
+Zaprojektowana struktura bazy danych systemu zarządzania magazynem
+została poprawnie znormalizowana do trzeciej postaci normalnej (3NF).
+Zastosowana normalizacja minimalizuje redundancję danych, ułatwia
+utrzymanie spójności informacji oraz poprawia wydajność operacji
+na bazie danych.

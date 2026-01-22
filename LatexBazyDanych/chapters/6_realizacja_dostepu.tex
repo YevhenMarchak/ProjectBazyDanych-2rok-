@@ -1,0 +1,229 @@
+\chapter{Interfejs użytkownika aplikacji}
+
+W niniejszym rozdziale przedstawiono interfejs użytkownika aplikacji
+zarządzania magazynem. Zaprezentowane ekrany ilustrują najważniejsze
+funkcjonalności systemu, w tym obsługę danych słownikowych, realizację
+operacji CRUD oraz wizualizację zapytań problemowych.
+
+\section{Główne okno aplikacji}
+
+Główne okno aplikacji stanowi centralny punkt dostępu do wszystkich
+funkcjonalności systemu. Użytkownik ma możliwość przechodzenia do
+poszczególnych modułów, takich jak zarządzanie kategoriami, klientami,
+pracownikami, produktami, lokalizacjami magazynowymi oraz realizacja
+zapytań problemowych.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=\textwidth]{figures/mainwindow.png}
+    \caption{Główne okno aplikacji}
+    \label{fig:mainwindow}
+\end{figure}
+
+\section{Zarządzanie kategoriami produktów}
+
+Okno zarządzania kategoriami umożliwia wykonywanie operacji CRUD
+(Create, Read, Update, Delete) na tabeli kategorii. Użytkownik może
+przeglądać listę istniejących kategorii, dodawać nowe rekordy,
+modyfikować istniejące dane oraz usuwać wybrane pozycje.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.8\textwidth]{figures/categories.jpg}
+    \caption{Okno zarządzania kategoriami}
+    \label{fig:categories}
+\end{figure}
+
+\section{Zarządzanie klientami}
+
+Moduł klientów umożliwia kompleksową obsługę danych kontrahentów.
+Dostępne są operacje dodawania, edycji oraz usuwania klientów, a także
+przegląd pełnej listy zapisanej w bazie danych. Dane prezentowane są
+w formie tabelarycznej, co ułatwia ich analizę i wyszukiwanie.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=\textwidth]{figures/clients.jpg}
+    \caption{Okno zarządzania klientami}
+    \label{fig:clients}
+\end{figure}
+
+\section{Zapytanie problemowe – premia pracowników}
+
+Okno premii pracowników umożliwia realizację zapytania problemowego
+polegającego na obliczeniu wysokości premii w zależności od liczby
+obsłużonych wysyłek w wybranym miesiącu i roku. Użytkownik wybiera
+parametry czasowe, a następnie generuje raport prezentujący wyniki
+obliczeń zgodnie z ustalonymi progami premiowymi.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=\textwidth]{figures/bonus_window_problemquestion.jpg}
+    \caption{Okno obliczania premii pracowników}
+    \label{fig:bonus}
+\end{figure}
+
+\section{Analiza produktywności pracowników}
+
+Na rysunku \ref{fig:employee_productivity} przedstawiono okno aplikacji
+umożliwiające analizę produktywności pracowników na podstawie liczby
+obsłużonych klientów. Funkcjonalność ta realizuje zapytanie problemowe,
+którego celem jest ocena efektywności pracy personelu magazynowego.
+
+Użytkownik może wygenerować raport, klikając przycisk
+\textit{Calculate Productivity}. Wyniki prezentowane są w formie
+czytelnego zestawienia tekstowego, zawierającego identyfikator
+pracownika, liczbę obsłużonych klientów oraz poziom produktywności.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=\textwidth]{figures/employeeproductivity_problemquestion.jpg}
+    \caption{Okno analizy produktywności pracowników}
+    \label{fig:employee_productivity}
+\end{figure}
+
+\section{Zarządzanie pracownikami}
+
+Na rysunku \ref{fig:employees} zaprezentowano interfejs zarządzania
+pracownikami systemu magazynowego. Widok ten realizuje pełny mechanizm
+CRUD (Create, Read, Update, Delete) dla encji \textit{Employees}.
+
+Górna część okna zawiera tabelę z listą pracowników, obejmującą dane
+takie jak imię, nazwisko, stanowisko, data zatrudnienia oraz dane
+kontaktowe. Dolna część formularza umożliwia dodawanie nowych rekordów,
+edycję istniejących oraz ich usuwanie za pomocą dedykowanych przycisków.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=\textwidth]{figures/employees.jpg}
+    \caption{Interfejs zarządzania pracownikami}
+    \label{fig:employees}
+\end{figure}
+
+\section{Zarządzanie stanami magazynowymi}
+
+Widok stanów magazynowych umożliwia przegląd aktualnych ilości
+produktów przypisanych do poszczególnych lokalizacji magazynowych.
+Użytkownik może dodawać nowe rekordy, aktualizować istniejące dane
+oraz usuwać wpisy dotyczące stanów magazynowych.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=\textwidth]{figures/inventory.jpg}
+    \caption{Widok stanów magazynowych}
+    \label{fig:inventory}
+\end{figure}
+
+\section{Zarządzanie lokalizacjami magazynowymi}
+
+Widok lokalizacji magazynowych umożliwia zarządzanie strukturą
+magazynu poprzez definiowanie poszczególnych lokalizacji oraz ich
+maksymalnej pojemności. Funkcjonalność ta pozwala na kontrolę
+rozmieszczenia towarów oraz zapewnia poprawne działanie procesów
+magazynowych.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=\textwidth]{figures/locations.jpg}
+    \caption{Widok lokalizacji magazynowych}
+    \label{fig:locations}
+\end{figure}
+
+\section{Najczęściej wysyłane produkty}
+
+Widok najczęściej wysyłanych produktów umożliwia identyfikację
+produktów, których łączna ilość wysyłek przekracza zadany próg.
+Użytkownik wprowadza minimalną wartość ilości, a następnie generuje
+raport prezentujący produkty spełniające to kryterium.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=\textwidth]{figures/mostshipped_problemquestion.jpg}
+    \caption{Zapytanie problemowe – najczęściej wysyłane produkty}
+    \label{fig:most_shipped}
+\end{figure}
+
+\section{Zarządzanie produktami}
+
+Widok zarządzania produktami umożliwia obsługę danych dotyczących
+asortymentu magazynowego. Użytkownik może dodawać nowe produkty,
+modyfikować istniejące rekordy oraz usuwać dane produktów.
+Informacje prezentowane są w formie tabelarycznej, co ułatwia ich
+przegląd i edycję.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=\textwidth]{figures/products.jpg}
+    \caption{Interfejs zarządzania produktami}
+    \label{fig:products}
+\end{figure}
+
+\section{Stopień realizacji dostawy}
+
+Widok stopnia realizacji dostawy umożliwia obliczenie procentowego
+poziomu realizacji przyjęcia towaru na podstawie ilości oczekiwanych
+oraz faktycznie odebranych produktów. Użytkownik podaje identyfikator
+dostawy, po czym system wykonuje odpowiednie obliczenia.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=\textwidth]{figures/receipt_problemquestion.jpg}
+    \caption{Widok obliczania stopnia realizacji dostawy}
+    \label{fig:receipt_completion_input}
+\end{figure}
+
+\section{Wynik obliczenia stopnia realizacji dostawy}
+
+Po wykonaniu obliczeń system prezentuje wynik w postaci procentowej
+oraz tekstowego statusu realizacji dostawy. Informacja ta pozwala
+na szybką ocenę kompletności przyjęcia towaru do magazynu.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=\textwidth]{figures/receipt_problemquestion_result.jpg}
+    \caption{Wynik obliczenia stopnia realizacji dostawy}
+    \label{fig:receipt_completion_result}
+\end{figure}
+
+
+\section{Zarządzanie przyjęciami towaru}
+
+Widok przyjęć towaru umożliwia rejestrowanie oraz obsługę dostaw
+przyjmowanych do magazynu. Użytkownik może dodawać nowe przyjęcia,
+aktualizować ich dane, usuwać wpisy oraz zarządzać szczegółami dostaw,
+takimi jak produkty, ilości oczekiwane oraz faktycznie odebrane.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=\textwidth]{figures/receipts.jpg}
+    \caption{Widok zarządzania przyjęciami towaru}
+    \label{fig:receipts}
+\end{figure}
+
+\section{Zarządzanie wysyłkami}
+
+Widok wysyłek umożliwia obsługę procesów wydawania towarów z magazynu
+do klientów. Użytkownik może rejestrować nowe wysyłki, przypisywać je
+do klientów oraz pracowników, a także zarządzać listą produktów
+przeznaczonych do wysyłki.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=\textwidth]{figures/shipments.jpg}
+    \caption{Widok zarządzania wysyłkami}
+    \label{fig:shipments}
+\end{figure}
+
+\section{Zarządzanie dostawcami}
+
+Widok zarządzania dostawcami umożliwia obsługę danych firm
+współpracujących z magazynem. Użytkownik może dodawać nowych dostawców,
+edytować istniejące dane oraz usuwać wpisy z bazy danych, zachowując
+spójność informacji wykorzystywanych w procesach przyjęć towaru.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=\textwidth]{figures/supplier.jpg}
+    \caption{Widok zarządzania dostawcami}
+    \label{fig:suppliers}
+\end{figure}

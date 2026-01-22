@@ -1,0 +1,13 @@
+\begin{thebibliography}{1}
+
+\bibitem{intellij}
+{JetBrains}.
+\newblock Intellij idea documentation.
+\newblock \url{https://www.jetbrains.com/idea/documentation/}, 2025.
+
+\bibitem{postgresql}
+{PostgreSQL Global Development Group}.
+\newblock Postgresql documentation.
+\newblock \url{https://www.postgresql.org/docs/}, 2024.
+
+\end{thebibliography}
